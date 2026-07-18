@@ -95,6 +95,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
     isProjectSelectionDisabled = false,
     showActionButtons = true,
     dataResetProperties = [],
+    handleDraftAndClose,
   } = props;
 
   // states
@@ -286,8 +287,11 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
         setGptAssistantModal(false);
         if (isCreateMoreToggleEnabled && workItemTemplateId) {
           void handleTemplateChange({
-            workspaceSlug: workspaceSlug?.toString(),
+            workspaceSlug: workspaceSlug?.toString() ?? "",
+            projectId: projectId ?? "",
             reset,
+            getValues,
+            setValue,
             editorRef,
           });
         } else {
