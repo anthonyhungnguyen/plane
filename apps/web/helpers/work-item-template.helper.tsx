@@ -74,7 +74,8 @@ export const applyWorkItemTemplate = async ({
     template?.description ??
     "";
 
-  const description = rawDescription && rawDescription.includes("<") ? rawDescription : markdownToHtml(rawDescription);
+  const descriptionText = typeof rawDescription === "string" ? rawDescription : "";
+  const description = descriptionText.includes("<") ? descriptionText : markdownToHtml(descriptionText);
 
   const allowedKeys: (keyof TIssue)[] = [
     "name",
