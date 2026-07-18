@@ -31,9 +31,9 @@ export function FilterOption(props: Props) {
       >
         {isChecked && <CheckIcon width={10} height={10} strokeWidth={3} />}
       </div>
-      <div className="flex items-center gap-2 truncate">
+      <div className="flex min-w-0 items-center gap-2">
         {icon && <div className="grid w-5 flex-shrink-0 place-items-center">{icon}</div>}
-        <div className="flex-grow truncate text-caption-sm-regular text-secondary">{title}</div>
+        <div className="min-w-0 flex-1 break-words text-caption-sm-regular text-secondary">{title}</div>
       </div>
       {activePulse && (
         <div className="ml-auto h-2 w-2 flex-shrink-0 animate-pulse rounded-full bg-accent-primary text-caption-sm-regular" />

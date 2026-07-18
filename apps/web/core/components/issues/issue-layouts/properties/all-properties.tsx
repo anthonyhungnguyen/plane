@@ -25,7 +25,7 @@ import {
   shouldHighlightIssueDueDate,
 } from "@plane/utils";
 // components
-import { CycleDropdown } from "@/components/dropdowns/cycle";
+import { CycleDropdown, CycleMultiDropdown } from "@/components/dropdowns/cycle";
 import { DateDropdown } from "@/components/dropdowns/date";
 import { DateRangeDropdown } from "@/components/dropdowns/date-range";
 import { EstimateDropdown } from "@/components/dropdowns/estimate";
@@ -144,6 +144,17 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
       else issueOperations.removeIssueFromCycle?.();
     },
     [issue, issueOperations]
+  );
+
+  const handleAdditionalCycles = useCallback(
+    (cycleIds: string[]) => {
+      if (!issue || !issue.cycle_id || !updateIssue) return;
+      const normalizedExtras = cycleIds.filter((cycleId) => cycleId !== issue.cycle_id);
+      const nextCycleIds = [issue.cycle_id, ...normalizedExtras];
+      if (nextCycleIds.join(",") === (issue.cycle_ids ?? []).join(",")) return;
+      void updateIssue(issue.project_id, issue.id, { cycle_ids: nextCycleIds });
+    },
+    [issue, updateIssue]
   );
 
   const handleStartDate = async (date: Date | null) => {
@@ -319,14 +330,14 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
         <div className="h-5" onFocus={handleEventPropagation} onClick={handleEventPropagation}>
           <MemberDropdown
             projectId={issue?.project_id}
-            value={issue?.assignee_ids}
-            onChange={handleAssignee}
+            value={issue?.assignee_ids?.[0] ?? null}
+            onChange={(val) => handleAssignee(val ? [val] : [])}
             disabled={isReadOnly}
-            multiple
+            multiple={false}
             buttonVariant={issue.assignee_ids?.length > 0 ? "transparent-without-text" : "border-without-text"}
             buttonClassName={issue.assignee_ids?.length > 0 ? "hover:bg-transparent px-0" : ""}
             showTooltip={issue?.assignee_ids?.length === 0}
-            placeholder={t("common.assignees")}
+            placeholder="Assignee"
             optionsClassName="z-10"
             tooltipContent=""
             renderByDefault={isMobile}
@@ -372,6 +383,25 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
                     buttonVariant="border-with-text"
                     renderByDefault={isMobile}
                     showTooltip
+                  />
+                </div>
+              </WithDisplayPropertiesHOC>
+            )}
+
+            {projectDetails?.cycle_view && (
+              <WithDisplayPropertiesHOC displayProperties={displayProperties} displayPropertyKey="cycle">
+                <div className="h-5" onFocus={handleEventPropagation} onClick={handleEventPropagation}>
+                  <CycleMultiDropdown
+                    buttonContainerClassName="truncate max-w-40"
+                    projectId={issue?.project_id}
+                    value={(issue?.cycle_ids ?? []).filter((cycleId) => cycleId !== issue?.cycle_id)}
+                    onChange={handleAdditionalCycles}
+                    disabled={isReadOnly || !issue?.cycle_id}
+                    buttonVariant="border-with-text"
+                    renderByDefault={isMobile}
+                    showTooltip
+                    placeholder={t("project_cycles.add_cycle")}
+                    currentCycleId={issue?.cycle_id ?? undefined}
                   />
                 </div>
               </WithDisplayPropertiesHOC>

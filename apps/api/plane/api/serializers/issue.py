@@ -16,6 +16,8 @@ from plane.db.models import (
     IssueType,
     IssueActivity,
     IssueAssignee,
+    Cycle,
+    CycleIssue,
     FileAsset,
     IssueComment,
     IssueLabel,
@@ -57,6 +59,12 @@ class IssueSerializer(BaseSerializer):
         write_only=True,
         required=False,
     )
+    cycle_ids = serializers.ListField(
+        child=serializers.PrimaryKeyRelatedField(queryset=Cycle.objects.all()),
+        write_only=True,
+        required=False,
+        allow_empty=True,
+    )
 
     labels = serializers.ListField(
         child=serializers.PrimaryKeyRelatedField(queryset=Label.objects.values_list("id", flat=True)),
@@ -73,6 +81,19 @@ class IssueSerializer(BaseSerializer):
         exclude = ["description_json", "description_stripped"]
 
     def validate(self, data):
+        if data.get("cycle_ids") is not None:
+            cycle_ids = [cycle.id for cycle in data["cycle_ids"]]
+            if cycle_ids:
+                valid_cycle_ids = set(
+                    Cycle.objects.filter(
+                        project_id=self.context.get("project_id"),
+                        workspace_id=self.context.get("workspace_id"),
+                        id__in=cycle_ids,
+                    ).values_list("id", flat=True)
+                )
+                if len(valid_cycle_ids) != len(set(cycle_ids)):
+                    raise serializers.ValidationError("Cycle is not valid please pass a valid cycle_id")
+
         if (
             data.get("start_date", None) is not None
             and data.get("target_date", None) is not None
@@ -105,6 +126,8 @@ class IssueSerializer(BaseSerializer):
 
         # Validate assignees are from project
         if data.get("assignees", []):
+            if len(data["assignees"]) > 1:
+                raise serializers.ValidationError("Issues can only have one assignee")
             data["assignees"] = ProjectMember.objects.filter(
                 project_id=self.context.get("project_id"),
                 is_active=True,
@@ -148,8 +171,111 @@ class IssueSerializer(BaseSerializer):
 
         return data
 
+    def _sync_cycle_ids(self, issue, cycle_ids):
+        if cycle_ids is None:
+            return
+
+        unique_cycle_ids = []
+        seen = set()
+        for cycle in cycle_ids:
+            cycle_id = cycle.id if hasattr(cycle, "id") else cycle
+            if cycle_id in seen:
+                continue
+            unique_cycle_ids.append(cycle_id)
+            seen.add(cycle_id)
+
+        if not unique_cycle_ids:
+            CycleIssue.objects.filter(issue=issue).delete()
+            return
+
+        desired_primary_id = unique_cycle_ids[0]
+        desired_ids_set = set(unique_cycle_ids)
+
+        existing_cycle_issues = list(
+            CycleIssue.objects.filter(issue=issue, deleted_at__isnull=True).order_by("created_at", "id")
+        )
+        existing_primary = existing_cycle_issues[0] if existing_cycle_issues else None
+
+        project_id = issue.project_id
+        workspace_id = issue.workspace_id
+        created_by_id = issue.created_by_id
+        updated_by_id = issue.updated_by_id
+
+        if not existing_primary:
+            CycleIssue.objects.create(
+                issue=issue,
+                project_id=project_id,
+                workspace_id=workspace_id,
+                cycle_id=desired_primary_id,
+                created_by_id=created_by_id,
+                updated_by_id=updated_by_id,
+            )
+            extra_ids = [cycle_id for cycle_id in unique_cycle_ids[1:] if cycle_id != desired_primary_id]
+            if extra_ids:
+                CycleIssue.objects.bulk_create(
+                    [
+                        CycleIssue(
+                            issue=issue,
+                            project_id=project_id,
+                            workspace_id=workspace_id,
+                            cycle_id=cycle_id,
+                            created_by_id=created_by_id,
+                            updated_by_id=updated_by_id,
+                        )
+                        for cycle_id in extra_ids
+                    ],
+                    batch_size=10,
+                    ignore_conflicts=True,
+                )
+            return
+
+        if existing_primary.cycle_id != desired_primary_id:
+            CycleIssue.objects.filter(issue=issue, cycle_id=desired_primary_id).exclude(pk=existing_primary.pk).delete()
+            old_primary_id = existing_primary.cycle_id
+            existing_primary.cycle_id = desired_primary_id
+            existing_primary.updated_by_id = updated_by_id
+            existing_primary.save(update_fields=["cycle_id", "updated_by_id", "updated_at"])
+            if old_primary_id in desired_ids_set and old_primary_id != desired_primary_id:
+                CycleIssue.objects.get_or_create(
+                    issue=issue,
+                    cycle_id=old_primary_id,
+                    defaults={
+                        "project_id": project_id,
+                        "workspace_id": workspace_id,
+                        "created_by_id": created_by_id,
+                        "updated_by_id": updated_by_id,
+                    },
+                )
+
+        existing_ids = set(
+            CycleIssue.objects.filter(issue=issue, deleted_at__isnull=True).values_list("cycle_id", flat=True)
+        )
+        remove_ids = existing_ids - desired_ids_set
+        if remove_ids:
+            CycleIssue.objects.filter(issue=issue, cycle_id__in=remove_ids).delete()
+
+        missing_ids = desired_ids_set - existing_ids
+        missing_ids.discard(desired_primary_id)
+        if missing_ids:
+            CycleIssue.objects.bulk_create(
+                [
+                    CycleIssue(
+                        issue=issue,
+                        project_id=project_id,
+                        workspace_id=workspace_id,
+                        cycle_id=cycle_id,
+                        created_by_id=created_by_id,
+                        updated_by_id=updated_by_id,
+                    )
+                    for cycle_id in missing_ids
+                ],
+                batch_size=10,
+                ignore_conflicts=True,
+            )
+
     def create(self, validated_data):
         assignees = validated_data.pop("assignees", None)
+        cycle_ids = validated_data.pop("cycle_ids", None)
         labels = validated_data.pop("labels", None)
 
         project_id = self.context["project_id"]
@@ -229,10 +355,14 @@ class IssueSerializer(BaseSerializer):
             except IntegrityError:
                 pass
 
+        if cycle_ids is not None:
+            self._sync_cycle_ids(issue, cycle_ids)
+
         return issue
 
     def update(self, instance, validated_data):
         assignees = validated_data.pop("assignees", None)
+        cycle_ids = validated_data.pop("cycle_ids", None)
         labels = validated_data.pop("labels", None)
 
         # Related models
@@ -282,6 +412,9 @@ class IssueSerializer(BaseSerializer):
                 )
             except IntegrityError:
                 pass
+
+        if cycle_ids is not None:
+            self._sync_cycle_ids(instance, cycle_ids)
 
         # Time updation occues even when other related models are updated
         instance.updated_at = timezone.now()

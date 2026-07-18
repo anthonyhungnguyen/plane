@@ -8,7 +8,12 @@
 import type { ETabIndices } from "@plane/constants";
 import { TAB_INDEX_MAP } from "@plane/constants";
 
-export const getTabIndex = (type?: ETabIndices, isMobile: boolean = false) => {
+type TTabIndexReturn = {
+  getIndex: (key: string) => number | undefined;
+  baseTabIndex: number;
+};
+
+export const getTabIndex = (type?: ETabIndices, isMobile: boolean = false): TTabIndexReturn => {
   const getIndex = (key: string) =>
     isMobile ? undefined : type && TAB_INDEX_MAP[type].findIndex((tabIndex) => tabIndex === key) + 1;
 

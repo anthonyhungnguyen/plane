@@ -30,7 +30,7 @@ export const InboxIssueAppliedFilters = observer(function InboxIssueAppliedFilte
       {/* priority */}
       <InboxIssueAppliedFiltersPriority />
       {/* assignees */}
-      <InboxIssueAppliedFiltersMember filterKey="assignees" label="Assignees" />
+      <InboxIssueAppliedFiltersMember filterKey="assignees" label="Assignee" />
       {/* created_by */}
       <InboxIssueAppliedFiltersMember filterKey="created_by" label="Created By" />
       {/* label */}

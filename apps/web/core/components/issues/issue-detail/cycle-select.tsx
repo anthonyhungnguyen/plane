@@ -10,7 +10,7 @@ import { useTranslation } from "@plane/i18n";
 // hooks
 // components
 import { cn } from "@plane/utils";
-import { CycleDropdown } from "@/components/dropdowns/cycle";
+import { CycleDropdown, CycleMultiDropdown } from "@/components/dropdowns/cycle";
 // ui
 // helpers
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
@@ -62,6 +62,49 @@ export const IssueCycleSelect = observer(function IssueCycleSelect(props: TIssue
         hideIcon
         dropdownArrow
         dropdownArrowClassName="h-3.5 w-3.5 hidden group-hover:inline"
+      />
+    </div>
+  );
+});
+
+export const IssueAdditionalCyclesSelect = observer(function IssueAdditionalCyclesSelect(props: TIssueCycleSelect) {
+  const { className = "", workspaceSlug, projectId, issueId, issueOperations, disabled = false } = props;
+  const { t } = useTranslation();
+  const [isUpdating, setIsUpdating] = useState(false);
+  const {
+    issue: { getIssueById },
+  } = useIssueDetail();
+  const issue = getIssueById(issueId);
+  const disableSelect = disabled || isUpdating || !issue?.cycle_id;
+
+  const handleAdditionalCyclesChange = async (cycleIds: string[]) => {
+    if (!issue || !issue.cycle_id) return;
+    const normalizedExtras = cycleIds.filter((cycleId) => cycleId !== issue.cycle_id);
+    const nextCycleIds = [issue.cycle_id, ...normalizedExtras];
+    if (nextCycleIds.join(",") === (issue.cycle_ids ?? []).join(",")) return;
+    setIsUpdating(true);
+    await issueOperations.update(workspaceSlug, projectId, issueId, { cycle_ids: nextCycleIds });
+    setIsUpdating(false);
+  };
+
+  const extraCycleIds = (issue?.cycle_ids ?? []).filter((cycleId) => cycleId !== issue?.cycle_id);
+
+  return (
+    <div className={cn("flex h-full items-center gap-1", className)}>
+      <CycleMultiDropdown
+        value={extraCycleIds}
+        onChange={handleAdditionalCyclesChange}
+        projectId={projectId}
+        disabled={disableSelect}
+        buttonVariant="transparent-with-text"
+        className="group w-full"
+        buttonContainerClassName="w-full text-left h-7.5 rounded-sm"
+        buttonClassName={`text-body-xs-medium justify-between ${extraCycleIds.length ? "" : "text-placeholder"}`}
+        placeholder={t("project_cycles.add_cycle")}
+        hideIcon
+        dropdownArrow
+        dropdownArrowClassName="h-3.5 w-3.5 hidden group-hover:inline"
+        currentCycleId={issue?.cycle_id ?? undefined}
       />
     </div>
   );

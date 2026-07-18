@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { observer } from "mobx-react";
-import type { Control } from "react-hook-form";
+import type { Control, UseFormGetValues, UseFormSetValue } from "react-hook-form";
 import { Controller } from "react-hook-form";
 import { ETabIndices, EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
@@ -14,10 +14,10 @@ import { ParentPropertyIcon } from "@plane/propel/icons";
 // types
 import type { ISearchIssueResponse, TIssue } from "@plane/types";
 // ui
-import { CustomMenu } from "@plane/ui";
+import { CustomMenu, ToggleSwitch } from "@plane/ui";
 import { getDate, renderFormattedPayloadDate, getTabIndex } from "@plane/utils";
 // components
-import { CycleDropdown } from "@/components/dropdowns/cycle";
+import { CycleDropdown, CycleMultiDropdown } from "@/components/dropdowns/cycle";
 import { DateDropdown } from "@/components/dropdowns/date";
 import { EstimateDropdown } from "@/components/dropdowns/estimate";
 import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
@@ -44,6 +44,8 @@ type TIssueDefaultPropertiesProps = {
   parentId: string | null;
   isDraft: boolean;
   handleFormChange: () => void;
+  getValues: UseFormGetValues<TIssue>;
+  setValue: UseFormSetValue<TIssue>;
   setSelectedParentIssue: (issue: ISearchIssueResponse) => void;
 };
 
@@ -59,6 +61,8 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
     parentId,
     isDraft,
     handleFormChange,
+    getValues,
+    setValue,
     setSelectedParentIssue,
   } = props;
   // states
@@ -128,15 +132,18 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
           <div className="h-7">
             <MemberDropdown
               projectId={projectId ?? undefined}
-              value={value}
-              onChange={(assigneeIds) => {
-                onChange(assigneeIds);
+              value={value?.[0] ?? null}
+              onChange={(val) => {
+                // Assuming 'data' refers to the current form data, which is not directly available here.
+                // The 'onChange' from field expects the new value for 'assignee_ids'.
+                // We convert the single selected value 'val' back into an array for 'assignee_ids'.
+                onChange(val ? [val] : []);
                 handleFormChange();
               }}
               buttonVariant={value?.length > 0 ? "transparent-without-text" : "border-with-text"}
               buttonClassName={value?.length > 0 ? "hover:bg-transparent" : ""}
-              placeholder={t("assignees")}
-              multiple
+              placeholder="Assignee"
+              multiple={false}
               tabIndex={getIndex("assignee_ids")}
             />
           </div>
@@ -207,7 +214,20 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
               <CycleDropdown
                 projectId={projectId ?? undefined}
                 onChange={(cycleId) => {
+                  const previousCycleId = getValues("cycle_id");
+                  const existingCycleIds = getValues("cycle_ids") ?? [];
                   onChange(cycleId);
+                  const normalizedCycleId = cycleId || null;
+                  const normalizedCycleIds = normalizedCycleId
+                    ? [
+                        normalizedCycleId,
+                        ...existingCycleIds.filter(
+                          (existingCycleId) =>
+                            existingCycleId !== normalizedCycleId && existingCycleId !== previousCycleId
+                        ),
+                      ]
+                    : [];
+                  setValue("cycle_ids", normalizedCycleIds, { shouldDirty: true });
                   handleFormChange();
                 }}
                 placeholder={t("cycle.label", { count: 1 })}
@@ -217,6 +237,34 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
               />
             </div>
           )}
+        />
+      )}
+      {projectDetails?.cycle_view && (
+        <Controller
+          control={control}
+          name="cycle_ids"
+          render={({ field: { value, onChange } }) => {
+            const primaryCycleId = getValues("cycle_id");
+            const extraCycleIds = (value ?? []).filter((cycleId) => cycleId !== primaryCycleId);
+            return (
+              <div className="h-7">
+                <CycleMultiDropdown
+                  projectId={projectId ?? undefined}
+                  value={extraCycleIds}
+                  onChange={(cycleIds) => {
+                    const normalizedExtras = cycleIds.filter((cycleId) => cycleId !== primaryCycleId);
+                    const updatedCycleIds = primaryCycleId ? [primaryCycleId, ...normalizedExtras] : normalizedExtras;
+                    onChange(updatedCycleIds);
+                    handleFormChange();
+                  }}
+                  placeholder={t("project_cycles.add_cycle")}
+                  disabled={!primaryCycleId}
+                  buttonVariant="border-with-text"
+                  currentCycleId={primaryCycleId ?? undefined}
+                />
+              </div>
+            );
+          }}
         />
       )}
       {projectDetails?.module_view && workspaceSlug && (
@@ -263,6 +311,23 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
           )}
         />
       )}
+      <Controller
+        control={control}
+        name="is_private"
+        render={({ field: { value, onChange } }) => (
+          <div className="flex h-7 items-center gap-1.5 rounded-sm border-[0.5px] border-strong px-2 py-0.5">
+            <ToggleSwitch
+              size="sm"
+              value={!!value}
+              onChange={(val) => {
+                onChange(val);
+                handleFormChange();
+              }}
+            />
+            <span className="text-11 whitespace-nowrap">{t("common.access.private")}</span>
+          </div>
+        )}
+      />
       <div className="h-7">
         {parentId ? (
           <CustomMenu

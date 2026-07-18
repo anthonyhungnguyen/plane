@@ -62,7 +62,7 @@ export const InboxIssueFilterSelection = observer(function InboxIssueFilterSelec
         <div className="py-2">
           <FilterMember
             filterKey="assignees"
-            label="Assignees"
+            label="Assignee"
             searchQuery={filtersSearchQuery}
             memberIds={projectMemberIds ?? []}
           />

@@ -31,6 +31,7 @@ type TMemberDropdownBaseProps = {
   onDropdownOpen?: () => void;
   optionsClassName?: string;
   renderByDefault?: boolean;
+  selectionLimit?: number;
 } & MemberDropdownProps;
 
 export const MemberDropdownBase = observer(function MemberDropdownBase(props: TMemberDropdownBaseProps) {
@@ -61,6 +62,7 @@ export const MemberDropdownBase = observer(function MemberDropdownBase(props: TM
     tabIndex,
     tooltipContent,
     value,
+    selectionLimit,
   } = props;
   // refs
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -84,7 +86,11 @@ export const MemberDropdownBase = observer(function MemberDropdownBase(props: TM
   });
 
   const dropdownOnChange = (val: string & string[]) => {
-    onChange(val);
+    let newValue = val;
+    if (selectionLimit && selectionLimit > 0 && Array.isArray(newValue) && newValue.length > selectionLimit) {
+      newValue = newValue.slice(-selectionLimit) as string & string[];
+    }
+    onChange(newValue);
     if (!multiple) handleClose();
   };
 
@@ -142,7 +148,7 @@ export const MemberDropdownBase = observer(function MemberDropdownBase(props: TM
             isActive={isOpen}
             tooltipHeading={placeholder}
             tooltipContent={
-              tooltipContent ?? `${value?.length ?? 0} ${value?.length !== 1 ? t("assignees") : t("assignee")}`
+              tooltipContent ?? `${value?.length ?? 0} ${t("assignee")}`
             }
             showTooltip={showTooltip}
             variant={buttonVariant}

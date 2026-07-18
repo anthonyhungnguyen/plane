@@ -148,12 +148,15 @@ export const createIssuePayload: (projectId: string, formData: Partial<TIssue>) 
   const payload: TIssue = {
     id: uuidv4(),
     project_id: projectId,
+    cycle_id: null,
     priority: "none",
     label_ids: [],
     assignee_ids: [],
+    cycle_ids: [],
     sub_issues_count: 0,
     attachment_count: 0,
     link_count: 0,
+    is_private: false,
     // tempId is used for optimistic updates. It is not a part of the API response.
     tempId: uuidv4(),
     // to be overridden by the form data
@@ -231,13 +234,13 @@ export const issueCountBasedOnFilters = (
   let issuesCount = 0;
   if (!layout) return issuesCount;
 
-  if (["spreadsheet", "gantt_chart"].includes(layout)) {
+  if ([EIssueLayoutTypes.SPREADSHEET, EIssueLayoutTypes.GANTT].includes(layout)) {
     issuesCount = (issueIds as TUnGroupedIssues)?.length;
-  } else if (layout === "calendar") {
+  } else if (layout === EIssueLayoutTypes.CALENDAR) {
     Object.keys(issueIds || {}).map((groupId) => {
       issuesCount += (issueIds as TGroupedIssues)?.[groupId]?.length;
     });
-  } else if (layout === "list") {
+  } else if (layout === EIssueLayoutTypes.LIST) {
     if (groupBy) {
       Object.keys(issueIds || {}).map((groupId) => {
         issuesCount += (issueIds as TGroupedIssues)?.[groupId]?.length;
@@ -245,7 +248,7 @@ export const issueCountBasedOnFilters = (
     } else {
       issuesCount = (issueIds as TUnGroupedIssues)?.length;
     }
-  } else if (layout === "kanban") {
+  } else if (layout === EIssueLayoutTypes.KANBAN) {
     if (groupBy && subGroupBy) {
       Object.keys(issueIds || {}).map((groupId) => {
         Object.keys((issueIds as TSubGroupedIssues)?.[groupId] || {}).map((subGroupId) => {

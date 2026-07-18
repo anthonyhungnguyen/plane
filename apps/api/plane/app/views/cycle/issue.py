@@ -7,8 +7,11 @@ import copy
 import json
 
 # Django imports
+from django.contrib.postgres.aggregates import ArrayAgg
+from django.contrib.postgres.fields import ArrayField
 from django.core import serializers
-from django.db.models import F, Func, OuterRef, Q, Subquery
+from django.db.models import F, Func, OuterRef, Q, Subquery, UUIDField, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.gzip import gzip_page
@@ -35,6 +38,14 @@ from plane.app.permissions import allow_permission, ROLE
 from plane.utils.host import base_host
 from plane.utils.filters import ComplexFilterBackend
 from plane.utils.filters import IssueFilterSet
+from plane.utils.cycle_assignment import assign_issues_to_cycle
+from plane.utils.issue_annotations import (
+    cycle_ids_subquery,
+    mention_ids_agg,
+    mention_ids_subquery,
+    subscriber_ids_agg,
+    subscriber_ids_subquery,
+)
 
 
 class CycleIssueViewSet(BaseViewSet):
@@ -78,8 +89,13 @@ class CycleIssueViewSet(BaseViewSet):
         return (
             issues.annotate(
                 cycle_id=Subquery(
-                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
+                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True)
+                    .order_by("created_at")
+                    .values("cycle_id")[:1]
                 )
+            )
+            .annotate(
+                cycle_ids=cycle_ids_subquery()
             )
             .annotate(
                 link_count=IssueLink.objects.filter(issue=OuterRef("id"))
@@ -227,93 +243,8 @@ class CycleIssueViewSet(BaseViewSet):
         if not issues:
             return Response({"error": "Issues are required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        cycle = Cycle.objects.get(workspace__slug=slug, project_id=project_id, pk=cycle_id)
-
-        if cycle.end_date is not None and cycle.end_date < timezone.now():
-            return Response(
-                {"error": "The Cycle has already been completed so no new issues can be added"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Get all CycleIssues already created
-        # Scope to workspace+project to prevent cross-tenant IDOR: without this
-        # scope, foreign-tenant CycleIssue rows matched by issue_id would be
-        # reassigned to the caller's cycle (GHSA-4w5x-wc9w-f47x).
-        cycle_issues = list(
-            CycleIssue.objects.filter(
-                ~Q(cycle_id=cycle_id),
-                issue_id__in=issues,
-                workspace__slug=slug,
-                project_id=project_id,
-            )
-        )
-        existing_issues = [str(cycle_issue.issue_id) for cycle_issue in cycle_issues]
-        new_issues = list(set(issues) - set(existing_issues))
-
-        # Scope to workspace+project to prevent cross-tenant IDOR
-        new_issues = list(
-            str(i)
-            for i in Issue.issue_objects.filter(
-                workspace__slug=slug,
-                project_id=project_id,
-                pk__in=new_issues,
-            ).values_list("id", flat=True)
-        )
-
-        # New issues to create
-        created_records = CycleIssue.objects.bulk_create(
-            [
-                CycleIssue(
-                    project_id=project_id,
-                    workspace_id=cycle.workspace_id,
-                    created_by_id=request.user.id,
-                    updated_by_id=request.user.id,
-                    cycle_id=cycle_id,
-                    issue_id=issue,
-                )
-                for issue in new_issues
-            ],
-            batch_size=10,
-        )
-
-        # Updated Issues
-        updated_records = []
-        update_cycle_issue_activity = []
-        # Iterate over each cycle_issue in cycle_issues
-        for cycle_issue in cycle_issues:
-            old_cycle_id = cycle_issue.cycle_id
-            # Update the cycle_issue's cycle_id
-            cycle_issue.cycle_id = cycle_id
-            # Add the modified cycle_issue to the records_to_update list
-            updated_records.append(cycle_issue)
-            # Record the update activity
-            update_cycle_issue_activity.append(
-                {
-                    "old_cycle_id": str(old_cycle_id),
-                    "new_cycle_id": str(cycle_id),
-                    "issue_id": str(cycle_issue.issue_id),
-                }
-            )
-
-        # Update the cycle issues
-        CycleIssue.objects.bulk_update(updated_records, ["cycle_id"], batch_size=100)
-        # Capture Issue Activity
-        issue_activity.delay(
-            type="cycle.activity.created",
-            requested_data=json.dumps({"cycles_list": issues}),
-            actor_id=str(self.request.user.id),
-            issue_id=None,
-            project_id=str(self.kwargs.get("project_id", None)),
-            current_instance=json.dumps(
-                {
-                    "updated_cycle_issues": update_cycle_issue_activity,
-                    "created_cycle_issues": serializers.serialize("json", created_records),
-                }
-            ),
-            epoch=int(timezone.now().timestamp()),
-            notification=True,
-            origin=base_host(request=request, is_app=True),
-        )
+        # GHN fork: multi-cycle assignment lives in plane.utils.cycle_assignment
+        assign_issues_to_cycle(request, slug, project_id, cycle_id, issues)
         return Response({"message": "success"}, status=status.HTTP_201_CREATED)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])

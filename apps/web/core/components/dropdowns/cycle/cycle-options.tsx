@@ -75,9 +75,8 @@ export const CycleOptions = observer(function CycleOptions(props: CycleOptionsPr
   });
 
   const cycleIds = (getProjectCycleIds(projectId) ?? [])?.filter((cycleId) => {
-    const cycleDetails = getCycleById(cycleId);
     if (currentCycleId && currentCycleId === cycleId) return false;
-    return cycleDetails?.status ? (cycleDetails?.status.toLowerCase() != "completed" ? true : false) : true;
+    return true;
   });
 
   const onOpen = () => {
@@ -140,7 +139,7 @@ export const CycleOptions = observer(function CycleOptions(props: CycleOptionsPr
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("common.search.label")}
-            displayValue={(assigned: any) => assigned?.name}
+            displayValue={(assigned: any) => (Array.isArray(assigned) ? "" : assigned?.name)}
             onKeyDown={searchInputKeyDown}
           />
         </div>

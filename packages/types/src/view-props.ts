@@ -153,7 +153,7 @@ export interface IIssueDisplayFilterOptions {
   };
   group_by?: TIssueGroupByOptions;
   sub_group_by?: TIssueGroupByOptions;
-  layout?: any; // TODO: Need to fix this and set it to enum EIssueLayoutTypes
+  layout?: TIssueLayouts;
   order_by?: TIssueOrderByOptions;
   show_empty_groups?: boolean;
   sub_issue?: boolean;
@@ -268,6 +268,6 @@ export interface IssuePaginationOptions {
 export type TSpreadsheetColumn = React.FC<{
   issue: TIssue;
   onClose: () => void;
-  onChange: (issue: TIssue, data: Partial<TIssue>, updates: any) => void;
+  onChange: (issue: TIssue, data: Partial<TIssue>, updates: unknown) => void;
   disabled: boolean;
 }>;

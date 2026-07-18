@@ -20,6 +20,7 @@ type TMemberDropdownProps = {
   optionsClassName?: string;
   projectId?: string;
   renderByDefault?: boolean;
+  selectionLimit?: number;
 } & MemberDropdownProps;
 
 export const MemberDropdown = observer(function MemberDropdown(props: TMemberDropdownProps) {
@@ -40,7 +41,7 @@ export const MemberDropdown = observer(function MemberDropdown(props: TMemberDro
       : workspaceMemberIds;
 
   const onDropdownOpen = () => {
-    if (!memberIds && projectId && workspaceSlug) fetchProjectMembers(workspaceSlug.toString(), projectId);
+    if (!memberIds && projectId && workspaceSlug) void fetchProjectMembers(workspaceSlug.toString(), projectId);
   };
 
   return (

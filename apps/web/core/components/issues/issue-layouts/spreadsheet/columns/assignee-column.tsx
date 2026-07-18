@@ -24,21 +24,21 @@ export const SpreadsheetAssigneeColumn = observer(function SpreadsheetAssigneeCo
   return (
     <div className="h-11 border-b-[0.5px] border-subtle">
       <MemberDropdown
-        value={issue?.assignee_ids ?? []}
+        value={issue?.assignee_ids?.[0] ?? null}
         onChange={(data) => {
           onChange(
             issue,
-            { assignee_ids: data },
+            { assignee_ids: data ? [data] : [] },
             {
               changed_property: "assignees",
-              change_details: data,
+              change_details: data ? [data] : [],
             }
           );
         }}
         projectId={issue?.project_id ?? undefined}
         disabled={disabled}
-        multiple
-        placeholder="Assignees"
+        multiple={false}
+        placeholder="Assignee"
         buttonVariant={
           issue?.assignee_ids && issue.assignee_ids.length > 1 ? "transparent-without-text" : "transparent-with-text"
         }

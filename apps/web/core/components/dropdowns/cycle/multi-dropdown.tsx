@@ -1,9 +1,3 @@
-/**
- * Copyright (c) 2023-present Plane Software, Inc. and contributors
- * SPDX-License-Identifier: AGPL-3.0-only
- * See the LICENSE file for details.
- */
-
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 import { observer } from "mobx-react";
@@ -21,22 +15,20 @@ import { DropdownButton } from "../buttons";
 import { BUTTON_VARIANTS_WITH_TEXT } from "../constants";
 import type { TDropdownProps } from "../types";
 import { CycleOptions } from "./cycle-options";
-import { CycleMultiDropdown } from "./multi-dropdown";
 
 type Props = TDropdownProps & {
   button?: ReactNode;
   dropdownArrow?: boolean;
   dropdownArrowClassName?: string;
-  onChange: (val: string | null) => void;
+  onChange: (val: string[]) => void;
   onClose?: () => void;
   projectId: string | undefined;
-  value: string | null;
-  canRemoveCycle?: boolean;
+  value: string[] | null;
   renderByDefault?: boolean;
   currentCycleId?: string;
 };
 
-export const CycleDropdown = observer(function CycleDropdown(props: Props) {
+export const CycleMultiDropdown = observer(function CycleMultiDropdown(props: Props) {
   const {
     button,
     buttonClassName,
@@ -55,14 +47,12 @@ export const CycleDropdown = observer(function CycleDropdown(props: Props) {
     showTooltip = false,
     tabIndex,
     value,
-    canRemoveCycle = true,
     renderByDefault = true,
     currentCycleId,
   } = props;
   // i18n
   const { t } = useTranslation();
   // states
-
   const [isOpen, setIsOpen] = useState(false);
   const { getCycleNameById } = useCycle();
   // refs
@@ -70,18 +60,24 @@ export const CycleDropdown = observer(function CycleDropdown(props: Props) {
   // popper-js refs
   const [referenceElement, setReferenceElement] = useState<HTMLButtonElement | null>(null);
 
-  const selectedName = value ? getCycleNameById(value) : null;
+  const selectedIds = value ?? [];
+  const selectedNames = selectedIds.map((cycleId) => getCycleNameById(cycleId)).filter(Boolean) as string[];
+  const selectedLabel =
+    selectedNames.length === 0
+      ? placeholder || t("project_cycles.add_cycle")
+      : selectedNames.length === 1
+        ? selectedNames[0]
+        : `${selectedNames[0]} +${selectedNames.length - 1}`;
 
-  const { handleClose, handleKeyDown, handleOnClick } = useDropdown({
+  const { handleKeyDown, handleOnClick } = useDropdown({
     dropdownRef,
     isOpen,
     onClose,
     setIsOpen,
   });
 
-  const dropdownOnChange = (val: string | null) => {
+  const dropdownOnChange = (val: string[]) => {
     onChange(val);
-    handleClose();
   };
 
   const comboButton = (
@@ -117,17 +113,20 @@ export const CycleDropdown = observer(function CycleDropdown(props: Props) {
             className={buttonClassName}
             isActive={isOpen}
             tooltipHeading={t("common.cycle")}
-            tooltipContent={selectedName ?? placeholder}
+            tooltipContent={selectedNames.length ? selectedNames.join(", ") : selectedLabel}
             showTooltip={showTooltip}
             variant={buttonVariant}
             renderToolTipByDefault={renderByDefault}
           >
             {!hideIcon && <CycleIcon className="h-3 w-3 flex-shrink-0" />}
-            {BUTTON_VARIANTS_WITH_TEXT.includes(buttonVariant) && (!!selectedName || !!placeholder) && (
-              <span className="max-w-40 truncate">{selectedName ?? placeholder}</span>
+            {BUTTON_VARIANTS_WITH_TEXT.includes(buttonVariant) && (
+              <span className="max-w-40 truncate">{selectedLabel}</span>
             )}
             {dropdownArrow && (
-              <ChevronDownIcon className={cn("h-2.5 w-2.5 flex-shrink-0", dropdownArrowClassName)} aria-hidden="true" />
+              <ChevronDownIcon
+                className={cn("h-2.5 w-2.5 flex-shrink-0", dropdownArrowClassName)}
+                aria-hidden="true"
+              />
             )}
           </DropdownButton>
         </button>
@@ -140,12 +139,13 @@ export const CycleDropdown = observer(function CycleDropdown(props: Props) {
       as="div"
       ref={dropdownRef}
       className={cn("h-full", className)}
-      value={value}
+      value={selectedIds}
       onChange={dropdownOnChange}
       disabled={disabled}
       onKeyDown={handleKeyDown}
       button={comboButton}
       renderByDefault={renderByDefault}
+      multiple
     >
       {isOpen && projectId && (
         <CycleOptions
@@ -153,12 +153,10 @@ export const CycleDropdown = observer(function CycleDropdown(props: Props) {
           projectId={projectId}
           placement={placement}
           referenceElement={referenceElement}
-          canRemoveCycle={canRemoveCycle}
+          canRemoveCycle={false}
           currentCycleId={currentCycleId}
         />
       )}
     </ComboDropDown>
   );
 });
-
-export { CycleMultiDropdown };

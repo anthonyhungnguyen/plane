@@ -36,16 +36,16 @@ export const createFilterUpdateHandler =
     selectedValues: T[],
     handleFiltersUpdate: (condition: TWorkItemFilterCondition) => void
   ) =>
-  (value: T | undefined) => {
-    const updatedValues = value ? [...selectedValues] : [];
+    (value: T | undefined) => {
+      const updatedValues = value ? [...selectedValues] : [];
 
-    if (value) {
-      if (updatedValues.includes(value)) {
-        updatedValues.splice(updatedValues.indexOf(value), 1);
-      } else {
-        updatedValues.push(value);
+      if (value) {
+        if (updatedValues.includes(value)) {
+          updatedValues.splice(updatedValues.indexOf(value), 1);
+        } else {
+          updatedValues.push(value);
+        }
       }
-    }
 
-    handleFiltersUpdate({ property, operator: "in", value: updatedValues });
-  };
+      handleFiltersUpdate({ property, operator: "in", value: updatedValues });
+    };

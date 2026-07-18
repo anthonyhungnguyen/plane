@@ -34,8 +34,8 @@ import { IssuePropertyLabels } from "../issue-layouts/properties";
 export interface IIssueProperties {
   issue: TWorkspaceDraftIssue;
   updateIssue:
-    | ((projectId: string | null, issueId: string, data: Partial<TWorkspaceDraftIssue>) => Promise<void>)
-    | undefined;
+  | ((projectId: string | null, issueId: string, data: Partial<TWorkspaceDraftIssue>) => Promise<void>)
+  | undefined;
   className: string;
 }
 
@@ -218,7 +218,7 @@ export const DraftIssueProperties = observer(function DraftIssueProperties(props
           buttonVariant={issue.assignee_ids?.length > 0 ? "transparent-without-text" : "border-without-text"}
           buttonClassName={issue.assignee_ids?.length > 0 ? "hover:bg-transparent px-0" : ""}
           showTooltip={issue?.assignee_ids?.length === 0}
-          placeholder="Assignees"
+          placeholder="Assignee"
           optionsClassName="z-10"
           tooltipContent=""
           renderByDefault={isMobile}

@@ -55,7 +55,7 @@ export function RecentProject(props: BlockProps) {
               <MemberDropdown
                 projectId={projectDetails?.id}
                 value={projectDetails?.project_members}
-                onChange={() => {}}
+                onChange={() => { }}
                 disabled
                 multiple
                 buttonVariant={
@@ -63,7 +63,7 @@ export function RecentProject(props: BlockProps) {
                 }
                 buttonClassName={projectDetails?.project_members?.length > 0 ? "hover:bg-transparent px-0" : ""}
                 showTooltip={projectDetails?.project_members?.length === 0}
-                placeholder="Assignees"
+                placeholder="Assignee"
                 optionsClassName="z-10"
                 tooltipContent=""
               />

@@ -432,18 +432,32 @@ def transfer_cycle_issues(
     current_cycle.save(update_fields=["progress_snapshot"])
 
     # Get issues to transfer (only incomplete issues)
-    cycle_issues = CycleIssue.objects.filter(
-        cycle_id=cycle_id,
-        project_id=project_id,
-        workspace__slug=slug,
-        issue__archived_at__isnull=True,
-        issue__is_draft=False,
-        issue__state__group__in=["backlog", "unstarted", "started"],
+    cycle_issues = list(
+        CycleIssue.objects.filter(
+            cycle_id=cycle_id,
+            project_id=project_id,
+            workspace__slug=slug,
+            issue__archived_at__isnull=True,
+            issue__is_draft=False,
+            issue__state__group__in=["backlog", "unstarted", "started"],
+        )
+    )
+
+    issue_ids = [cycle_issue.issue_id for cycle_issue in cycle_issues]
+    existing_target_issue_ids = set(
+        CycleIssue.objects.filter(
+            cycle_id=new_cycle_id,
+            issue_id__in=issue_ids,
+            deleted_at__isnull=True,
+        ).values_list("issue_id", flat=True)
     )
 
     updated_cycles = []
     update_cycle_issue_activity = []
     for cycle_issue in cycle_issues:
+        if cycle_issue.issue_id in existing_target_issue_ids:
+            cycle_issue.delete()
+            continue
         cycle_issue.cycle_id = new_cycle_id
         updated_cycles.append(cycle_issue)
         update_cycle_issue_activity.append(
@@ -454,8 +468,8 @@ def transfer_cycle_issues(
             }
         )
 
-    # Bulk update cycle issues
-    cycle_issues = CycleIssue.objects.bulk_update(updated_cycles, ["cycle_id"], batch_size=100)
+    if updated_cycles:
+        CycleIssue.objects.bulk_update(updated_cycles, ["cycle_id"], batch_size=100)
 
     # Capture Issue Activity
     issue_activity.delay(

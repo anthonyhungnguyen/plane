@@ -39,9 +39,15 @@ export const CreateUpdateIssueModal = observer(function CreateUpdateIssueModal(p
   // router params
   const { cycleId, moduleId } = useParams();
   // derived values
+  const resolvedCycleId = props.data?.cycle_id ? props.data?.cycle_id : cycleId ? cycleId.toString() : null;
   const dataForPreload = {
     ...props.data,
-    cycle_id: props.data?.cycle_id ? props.data?.cycle_id : cycleId ? cycleId.toString() : null,
+    cycle_id: resolvedCycleId,
+    cycle_ids: props.data?.cycle_ids
+      ? props.data?.cycle_ids
+      : resolvedCycleId
+        ? [resolvedCycleId]
+        : [],
     module_ids: props.data?.module_ids ? props.data?.module_ids : moduleId ? [moduleId.toString()] : null,
   };
 

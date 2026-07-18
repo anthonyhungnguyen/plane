@@ -52,6 +52,7 @@ from plane.utils.host import base_host
 from .base import BaseAPIView
 from plane.bgtasks.webhook_task import model_activity
 from plane.utils.openapi.decorators import cycle_docs
+from plane.utils.cycle_assignment import assign_issues_to_cycle
 from plane.utils.openapi import (
     CURSOR_PARAMETER,
     PER_PAGE_PARAMETER,
@@ -977,88 +978,10 @@ class CycleIssueListCreateAPIEndpoint(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        cycle = Cycle.objects.get(workspace__slug=slug, project_id=project_id, pk=cycle_id)
+        # GHN fork: multi-cycle assignment (workspace/project scoped) lives in
+        # plane.utils.cycle_assignment
+        assign_issues_to_cycle(request, slug, project_id, cycle_id, issues)
 
-        if cycle.end_date is not None and cycle.end_date < timezone.now():
-            return Response(
-                {
-                    "code": "CYCLE_COMPLETED",
-                    "message": "The Cycle has already been completed so no new issues can be added",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Get all CycleWorkItems already created
-        cycle_issues = list(CycleIssue.objects.filter(~Q(cycle_id=cycle_id), issue_id__in=issues))
-        existing_issues = [
-            str(cycle_issue.issue_id) for cycle_issue in cycle_issues if str(cycle_issue.issue_id) in issues
-        ]
-        new_issues = list(set(issues) - set(existing_issues))
-
-        # Scope to workspace+project to prevent cross-tenant IDOR
-        new_issues = list(
-            str(i)
-            for i in Issue.issue_objects.filter(
-                workspace__slug=slug,
-                project_id=project_id,
-                pk__in=new_issues,
-            ).values_list("id", flat=True)
-        )
-
-        # New issues to create
-        created_records = CycleIssue.objects.bulk_create(
-            [
-                CycleIssue(
-                    project_id=project_id,
-                    workspace_id=cycle.workspace_id,
-                    cycle_id=cycle_id,
-                    issue_id=issue,
-                )
-                for issue in new_issues
-            ],
-            ignore_conflicts=True,
-            batch_size=10,
-        )
-
-        # Updated Issues
-        updated_records = []
-        update_cycle_issue_activity = []
-        # Iterate over each cycle_issue in cycle_issues
-        for cycle_issue in cycle_issues:
-            old_cycle_id = cycle_issue.cycle_id
-            # Update the cycle_issue's cycle_id
-            cycle_issue.cycle_id = cycle_id
-            # Add the modified cycle_issue to the records_to_update list
-            updated_records.append(cycle_issue)
-            # Record the update activity
-            update_cycle_issue_activity.append(
-                {
-                    "old_cycle_id": str(old_cycle_id),
-                    "new_cycle_id": str(cycle_id),
-                    "issue_id": str(cycle_issue.issue_id),
-                }
-            )
-
-        # Update the cycle issues
-        CycleIssue.objects.bulk_update(updated_records, ["cycle_id"], batch_size=100)
-
-        # Capture Issue Activity
-        issue_activity.delay(
-            type="cycle.activity.created",
-            requested_data=json.dumps({"cycles_list": issues}),
-            actor_id=str(self.request.user.id),
-            issue_id=None,
-            project_id=str(self.kwargs.get("project_id", None)),
-            current_instance=json.dumps(
-                {
-                    "updated_cycle_issues": update_cycle_issue_activity,
-                    "created_cycle_issues": serializers.serialize("json", created_records),
-                }
-            ),
-            epoch=int(timezone.now().timestamp()),
-            notification=True,
-            origin=base_host(request=request, is_app=True),
-        )
         # Return all Cycle Issues
         return Response(
             CycleIssueSerializer(self.get_queryset(), many=True).data,

@@ -373,8 +373,17 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
 
     try {
       if (beforeFormSubmit) await beforeFormSubmit();
-      if (!data?.id) response = await handleCreateIssue(payload, is_draft_issue);
-      else response = await handleUpdateIssue(payload);
+      const normalizedPayload = (() => {
+        const cycleId = payload.cycle_id;
+        const cycleIds = payload.cycle_ids ?? (cycleId ? [cycleId] : undefined);
+        if (!cycleIds) return payload;
+        const uniqueCycleIds = cycleId
+          ? [cycleId, ...cycleIds.filter((id) => id !== cycleId)]
+          : cycleIds;
+        return { ...payload, cycle_ids: uniqueCycleIds };
+      })();
+      if (!data?.id) response = await handleCreateIssue(normalizedPayload, is_draft_issue);
+      else response = await handleUpdateIssue(normalizedPayload);
     } finally {
       if (response != undefined && onSubmit) await onSubmit(response);
     }
@@ -389,12 +398,14 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
   // don't open the modal if there are no projects
   if (!allowedProjectIds || allowedProjectIds.length === 0 || !activeProjectId) return null;
 
+  const resolvedCycleId = data?.cycle_id ? data?.cycle_id : cycleId ? cycleId.toString() : null;
   const commonIssueModalProps: IssueFormProps = {
     issueTitleRef: issueTitleRef,
     data: {
       ...data,
       description_html: description,
-      cycle_id: data?.cycle_id ? data?.cycle_id : cycleId ? cycleId.toString() : null,
+      cycle_id: resolvedCycleId,
+      cycle_ids: data?.cycle_ids ? data?.cycle_ids : resolvedCycleId ? [resolvedCycleId] : [],
       module_ids: data?.module_ids ? data?.module_ids : moduleId ? [moduleId.toString()] : null,
     },
     onAssetUpload: handleUpdateUploadedAssetIds,

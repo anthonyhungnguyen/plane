@@ -118,13 +118,13 @@ export const RecentIssue = observer(function RecentIssue(props: BlockProps) {
               <MemberDropdown
                 projectId={issueDetails?.project_id}
                 value={issueDetails?.assignees}
-                onChange={() => {}}
+                onChange={() => { }}
                 disabled
                 multiple
                 buttonVariant={issueDetails?.assignees?.length > 0 ? "transparent-without-text" : "border-without-text"}
                 buttonClassName={issueDetails?.assignees?.length > 0 ? "hover:bg-transparent px-0" : ""}
                 showTooltip={issueDetails?.assignees?.length === 0}
-                placeholder="Assignees"
+                placeholder="Assignee"
                 optionsClassName="z-10"
                 tooltipContent=""
               />

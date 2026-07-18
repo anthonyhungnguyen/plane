@@ -260,6 +260,59 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
     this.controller = new AbortController();
   }
 
+  private normalizeCycleId = (cycleId?: string | null) => {
+    if (!cycleId || cycleId === "None") return null;
+    return cycleId;
+  };
+
+  private normalizeCycleIdsList = (cycleIds?: string[] | null) => {
+    if (!cycleIds) return [];
+    const seen = new Set<string>();
+    const normalized: string[] = [];
+    for (const cycleId of cycleIds) {
+      const cleanedCycleId = this.normalizeCycleId(cycleId);
+      if (!cleanedCycleId || seen.has(cleanedCycleId)) continue;
+      seen.add(cleanedCycleId);
+      normalized.push(cleanedCycleId);
+    }
+    return normalized;
+  };
+
+  private getCycleUpdateData = (issueBeforeUpdate: TIssue | undefined, data: Partial<TIssue>): Partial<TIssue> => {
+    if (!issueBeforeUpdate) return data;
+
+    const hasCycleIds = Object.prototype.hasOwnProperty.call(data, "cycle_ids");
+    const hasCycleId = Object.prototype.hasOwnProperty.call(data, "cycle_id");
+
+    if (!hasCycleIds && !hasCycleId) return data;
+
+    const normalizedData: Partial<TIssue> = { ...data };
+    const existingCycleIds = this.normalizeCycleIdsList(issueBeforeUpdate.cycle_ids);
+    const existingPrimary = this.normalizeCycleId(issueBeforeUpdate.cycle_id);
+
+    if (hasCycleIds) {
+      const normalizedCycleIds = this.normalizeCycleIdsList(data.cycle_ids);
+      normalizedData.cycle_ids = normalizedCycleIds;
+      if (!hasCycleId) normalizedData.cycle_id = normalizedCycleIds[0] ?? null;
+      return normalizedData;
+    }
+
+    if (hasCycleId) {
+      const nextPrimary = this.normalizeCycleId(data.cycle_id);
+      if (!nextPrimary) {
+        normalizedData.cycle_ids = [];
+        return normalizedData;
+      }
+      const updatedCycleIds = [
+        nextPrimary,
+        ...existingCycleIds.filter((cycleId) => cycleId !== nextPrimary && cycleId !== existingPrimary),
+      ];
+      normalizedData.cycle_ids = updatedCycleIds;
+    }
+
+    return normalizedData;
+  };
+
   // Abstract class to be implemented to fetch parent stats such as project, module or cycle details
   abstract fetchParentStats: (workspaceSlug: string, projectId?: string, id?: string) => void;
 
@@ -561,10 +614,11 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
   ) {
     // Store Before state of the issue
     const issueBeforeUpdate = clone(this.rootIssueStore.issues.getIssueById(issueId));
+    const normalizedData = this.getCycleUpdateData(issueBeforeUpdate, data);
     try {
       // Update the Respective Stores
-      this.rootIssueStore.issues.updateIssue(issueId, data);
-      this.updateIssueList({ ...issueBeforeUpdate, ...data } as TIssue, issueBeforeUpdate);
+      this.rootIssueStore.issues.updateIssue(issueId, normalizedData);
+      this.updateIssueList({ ...issueBeforeUpdate, ...normalizedData } as TIssue, issueBeforeUpdate);
 
       // Check if should Sync
       if (!shouldSync) return;
@@ -572,18 +626,18 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
       // update parent stats optimistically
       this.updateParentStats(issueBeforeUpdate, {
         ...issueBeforeUpdate,
-        ...data,
+        ...normalizedData,
       } as TIssue);
 
       // call API to update the issue
-      await this.issueService.patchIssue(workspaceSlug, projectId, issueId, data);
+      await this.issueService.patchIssue(workspaceSlug, projectId, issueId, normalizedData);
 
       // call fetch Parent Stats
       this.fetchParentStats(workspaceSlug, projectId);
     } catch (error) {
       // If errored out update store again to revert the change
       this.rootIssueStore.issues.updateIssue(issueId, issueBeforeUpdate ?? {});
-      this.updateIssueList(issueBeforeUpdate, { ...issueBeforeUpdate, ...data } as TIssue);
+      this.updateIssueList(issueBeforeUpdate, { ...issueBeforeUpdate, ...normalizedData } as TIssue);
       throw error;
     }
   }
@@ -728,8 +782,16 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
       issueIds.forEach((issueId) => {
         const issueBeforeUpdate = clone(this.rootIssueStore.issues.getIssueById(issueId));
         if (!issueBeforeUpdate) throw new Error("Work item not found");
+        const cycleUpdate: Partial<TIssue> = {};
+        if (Object.prototype.hasOwnProperty.call(data.properties, "cycle_id")) {
+          cycleUpdate.cycle_id = data.properties.cycle_id ?? null;
+        }
+        if (Object.prototype.hasOwnProperty.call(data.properties, "cycle_ids")) {
+          cycleUpdate.cycle_ids = data.properties.cycle_ids ?? [];
+        }
         Object.keys(data.properties).forEach((key) => {
           const property = key as keyof TBulkOperationsPayload["properties"];
+          if (property === "cycle_id" || property === "cycle_ids") return;
           const propertyValue = data.properties[property];
           // update root issue map properties
           if (Array.isArray(propertyValue)) {
@@ -747,6 +809,10 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
             });
           }
         });
+        if (Object.keys(cycleUpdate).length > 0) {
+          const normalizedCycleData = this.getCycleUpdateData(issueBeforeUpdate, cycleUpdate);
+          this.rootIssueStore.issues.updateIssue(issueId, normalizedCycleData);
+        }
         const issueDetails = this.rootIssueStore.issues.getIssueById(issueId);
         this.updateIssueList(issueDetails, issueBeforeUpdate);
       });
