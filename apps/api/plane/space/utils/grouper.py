@@ -56,6 +56,10 @@ def issue_queryset_grouper(
             "issue_module__module_id",
             ~Q(issue_module__module_id__isnull=True),
         ),
+        "cycle_ids": (
+            "issue_cycle__cycle_id",
+            ~Q(issue_cycle__cycle_id__isnull=True) & Q(issue_cycle__deleted_at__isnull=True),
+        ),
     }
     default_annotations = {
         key: Coalesce(
@@ -78,7 +82,7 @@ def issue_on_results(
         "issue_module__module_id": "module_ids",
     }
 
-    original_list = ["assignee_ids", "label_ids", "module_ids"]
+    original_list = ["assignee_ids", "label_ids", "module_ids", "cycle_ids"]
 
     required_fields = [
         "id",
@@ -93,6 +97,7 @@ def issue_on_results(
         "project_id",
         "parent_id",
         "cycle_id",
+        "cycle_ids",
         "created_by",
         "state__group",
     ]

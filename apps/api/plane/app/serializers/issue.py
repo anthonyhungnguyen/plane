@@ -42,6 +42,7 @@ from plane.db.models import (
     IssueDescriptionVersion,
     ProjectMember,
     EstimatePoint,
+    IssueMention,
 )
 from plane.utils.content_validator import (
     validate_html_content,
@@ -97,6 +98,13 @@ class IssueCreateSerializer(BaseSerializer):
         write_only=True,
         required=False,
     )
+    cycle_ids = serializers.ListField(
+        child=serializers.PrimaryKeyRelatedField(queryset=Cycle.objects.all()),
+        write_only=True,
+        required=False,
+        allow_empty=True,
+        allow_null=True,
+    )
     project_id = serializers.UUIDField(source="project.id", read_only=True)
     workspace_id = serializers.UUIDField(source="workspace.id", read_only=True)
 
@@ -119,6 +127,8 @@ class IssueCreateSerializer(BaseSerializer):
         data["assignee_ids"] = assignee_ids if assignee_ids else []
         label_ids = self.initial_data.get("label_ids")
         data["label_ids"] = label_ids if label_ids else []
+        cycle_ids = self.initial_data.get("cycle_ids")
+        data["cycle_ids"] = cycle_ids if cycle_ids else []
         return data
 
     def validate(self, attrs):
@@ -165,6 +175,20 @@ class IssueCreateSerializer(BaseSerializer):
                 ).values_list("id", flat=True)
             )
 
+        if attrs.get("cycle_ids") is not None:
+            cycle_ids = [cycle.id for cycle in attrs["cycle_ids"]]
+            if cycle_ids:
+                project_id = self.context.get("project_id") or getattr(self.instance, "project_id", None)
+                workspace_id = self.context.get("workspace_id") or getattr(self.instance, "workspace_id", None)
+                cycle_queryset = Cycle.objects.all()
+                if project_id:
+                    cycle_queryset = cycle_queryset.filter(project_id=project_id)
+                if workspace_id:
+                    cycle_queryset = cycle_queryset.filter(workspace_id=workspace_id)
+                valid_cycle_ids = set(cycle_queryset.filter(id__in=cycle_ids).values_list("id", flat=True))
+                if len(valid_cycle_ids) != len(set(cycle_ids)):
+                    raise serializers.ValidationError("Cycle is not valid please pass a valid cycle_id")
+
         # Check state is from the project only else raise validation error
         if (
             attrs.get("state")
@@ -196,9 +220,112 @@ class IssueCreateSerializer(BaseSerializer):
 
         return attrs
 
+    def _sync_cycle_ids(self, issue, cycle_ids):
+        if cycle_ids is None:
+            return
+
+        unique_cycle_ids = []
+        seen = set()
+        for cycle in cycle_ids:
+            cycle_id = cycle.id if hasattr(cycle, "id") else cycle
+            if cycle_id in seen:
+                continue
+            unique_cycle_ids.append(cycle_id)
+            seen.add(cycle_id)
+
+        if not unique_cycle_ids:
+            CycleIssue.objects.filter(issue=issue).delete()
+            return
+
+        desired_primary_id = unique_cycle_ids[0]
+        desired_ids_set = set(unique_cycle_ids)
+
+        existing_cycle_issues = list(
+            CycleIssue.objects.filter(issue=issue, deleted_at__isnull=True).order_by("created_at", "id")
+        )
+        existing_primary = existing_cycle_issues[0] if existing_cycle_issues else None
+
+        project_id = issue.project_id
+        workspace_id = issue.workspace_id
+        created_by_id = issue.created_by_id
+        updated_by_id = issue.updated_by_id
+
+        if not existing_primary:
+            CycleIssue.objects.create(
+                issue=issue,
+                project_id=project_id,
+                workspace_id=workspace_id,
+                cycle_id=desired_primary_id,
+                created_by_id=created_by_id,
+                updated_by_id=updated_by_id,
+            )
+            extra_ids = [cycle_id for cycle_id in unique_cycle_ids[1:] if cycle_id != desired_primary_id]
+            if extra_ids:
+                CycleIssue.objects.bulk_create(
+                    [
+                        CycleIssue(
+                            issue=issue,
+                            project_id=project_id,
+                            workspace_id=workspace_id,
+                            cycle_id=cycle_id,
+                            created_by_id=created_by_id,
+                            updated_by_id=updated_by_id,
+                        )
+                        for cycle_id in extra_ids
+                    ],
+                    batch_size=10,
+                    ignore_conflicts=True,
+                )
+            return
+
+        if existing_primary.cycle_id != desired_primary_id:
+            CycleIssue.objects.filter(issue=issue, cycle_id=desired_primary_id).exclude(pk=existing_primary.pk).delete()
+            old_primary_id = existing_primary.cycle_id
+            existing_primary.cycle_id = desired_primary_id
+            existing_primary.updated_by_id = updated_by_id
+            existing_primary.save(update_fields=["cycle_id", "updated_by_id", "updated_at"])
+            if old_primary_id in desired_ids_set and old_primary_id != desired_primary_id:
+                CycleIssue.objects.get_or_create(
+                    issue=issue,
+                    cycle_id=old_primary_id,
+                    defaults={
+                        "project_id": project_id,
+                        "workspace_id": workspace_id,
+                        "created_by_id": created_by_id,
+                        "updated_by_id": updated_by_id,
+                    },
+                )
+
+        existing_ids = set(
+            CycleIssue.objects.filter(issue=issue, deleted_at__isnull=True).values_list("cycle_id", flat=True)
+        )
+        remove_ids = existing_ids - desired_ids_set
+        if remove_ids:
+            CycleIssue.objects.filter(issue=issue, cycle_id__in=remove_ids).delete()
+
+        missing_ids = desired_ids_set - existing_ids
+        missing_ids.discard(desired_primary_id)
+        if missing_ids:
+            CycleIssue.objects.bulk_create(
+                [
+                    CycleIssue(
+                        issue=issue,
+                        project_id=project_id,
+                        workspace_id=workspace_id,
+                        cycle_id=cycle_id,
+                        created_by_id=created_by_id,
+                        updated_by_id=updated_by_id,
+                    )
+                    for cycle_id in missing_ids
+                ],
+                batch_size=10,
+                ignore_conflicts=True,
+            )
+
     def create(self, validated_data):
         assignees = validated_data.pop("assignee_ids", None)
         labels = validated_data.pop("label_ids", None)
+        cycle_ids = validated_data.pop("cycle_ids", None)
 
         project_id = self.context["project_id"]
         workspace_id = self.context["workspace_id"]
@@ -271,11 +398,14 @@ class IssueCreateSerializer(BaseSerializer):
             except IntegrityError:
                 pass
 
+        self._sync_cycle_ids(issue, cycle_ids)
+
         return issue
 
     def update(self, instance, validated_data):
         assignees = validated_data.pop("assignee_ids", None)
         labels = validated_data.pop("label_ids", None)
+        cycle_ids = validated_data.pop("cycle_ids", None)
 
         # Related models
         project_id = instance.project_id
@@ -324,6 +454,8 @@ class IssueCreateSerializer(BaseSerializer):
                 )
             except IntegrityError:
                 pass
+
+        self._sync_cycle_ids(instance, cycle_ids)
 
         # Time updation occues even when other related models are updated
         instance.updated_at = timezone.now()
@@ -770,6 +902,7 @@ class IssueIntakeSerializer(DynamicBaseSerializer):
 class IssueSerializer(DynamicBaseSerializer):
     # ids
     cycle_id = serializers.PrimaryKeyRelatedField(read_only=True)
+    cycle_ids = serializers.SerializerMethodField()
     module_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
 
     # Many to many
@@ -797,6 +930,7 @@ class IssueSerializer(DynamicBaseSerializer):
             "project_id",
             "parent_id",
             "cycle_id",
+            "cycle_ids",
             "module_ids",
             "label_ids",
             "assignee_ids",
@@ -808,6 +942,7 @@ class IssueSerializer(DynamicBaseSerializer):
             "attachment_count",
             "link_count",
             "is_draft",
+            "is_private",
             "archived_at",
         ]
         read_only_fields = fields
@@ -819,6 +954,14 @@ class IssueSerializer(DynamicBaseSerializer):
         ):
             raise serializers.ValidationError("State is not valid please pass a valid state_id")
         return data
+
+    def get_cycle_ids(self, obj):
+        annotated_cycle_ids = getattr(obj, "cycle_ids", None)
+        if annotated_cycle_ids is not None:
+            return annotated_cycle_ids
+        return list(
+            CycleIssue.objects.filter(issue_id=obj.id, deleted_at__isnull=True).values_list("cycle_id", flat=True)
+        )
 
 
 class IssueListDetailSerializer(serializers.Serializer):
@@ -832,11 +975,27 @@ class IssueListDetailSerializer(serializers.Serializer):
     def get_module_ids(self, obj):
         return [module.module_id for module in obj.issue_module.all()]
 
+    def get_cycle_ids(self, obj):
+        annotated_cycle_ids = getattr(obj, "cycle_ids", None)
+        if annotated_cycle_ids is not None:
+            return annotated_cycle_ids
+        return [cycle.cycle_id for cycle in obj.issue_cycle.all()]
+
     def get_label_ids(self, obj):
         return [label.label_id for label in obj.label_issue.all()]
 
     def get_assignee_ids(self, obj):
         return [assignee.assignee_id for assignee in obj.issue_assignee.all()]
+
+    def get_mention_ids(self, obj):
+        annotated_mentions = getattr(obj, "mention_ids", []) or []
+        if annotated_mentions:
+            return annotated_mentions
+        return list(
+            IssueMention.objects.filter(issue_id=obj.id, deleted_at__isnull=True).values_list(
+                "mention_id", flat=True
+            )
+        )
 
     def to_representation(self, instance):
         data = {
@@ -858,12 +1017,15 @@ class IssueListDetailSerializer(serializers.Serializer):
             "created_by": instance.created_by_id,
             "updated_by": instance.updated_by_id,
             "is_draft": instance.is_draft,
+            "is_private": instance.is_private,
             "archived_at": instance.archived_at,
             # Computed fields
             "cycle_id": instance.cycle_id,
+            "cycle_ids": self.get_cycle_ids(instance),
             "module_ids": self.get_module_ids(instance),
             "label_ids": self.get_label_ids(instance),
             "assignee_ids": self.get_assignee_ids(instance),
+            "mention_ids": self.get_mention_ids(instance),
             "sub_issues_count": instance.sub_issues_count,
             "attachment_count": instance.attachment_count,
             "link_count": instance.link_count,
@@ -935,14 +1097,38 @@ class IssueDetailSerializer(IssueSerializer):
     description_html = serializers.CharField()
     is_subscribed = serializers.BooleanField(read_only=True)
     is_intake = serializers.BooleanField(read_only=True)
+    subscriber_ids = serializers.SerializerMethodField()
+    mention_ids = serializers.SerializerMethodField()
 
     class Meta(IssueSerializer.Meta):
         fields = IssueSerializer.Meta.fields + [
             "description_html",
             "is_subscribed",
             "is_intake",
+            "subscriber_ids",
+            "mention_ids",
         ]
         read_only_fields = fields
+
+    def get_subscriber_ids(self, obj):
+        annotated_subscribers = getattr(obj, "subscriber_ids", []) or []
+        if annotated_subscribers:
+            return annotated_subscribers
+        return list(
+            IssueSubscriber.objects.filter(issue_id=obj.id, deleted_at__isnull=True).values_list(
+                "subscriber_id", flat=True
+            )
+        )
+
+    def get_mention_ids(self, obj):
+        annotated_mentions = getattr(obj, "mention_ids", []) or []
+        if annotated_mentions:
+            return annotated_mentions
+        return list(
+            IssueMention.objects.filter(issue_id=obj.id, deleted_at__isnull=True).values_list(
+                "mention_id", flat=True
+            )
+        )
 
 
 class IssuePublicSerializer(BaseSerializer):
@@ -975,7 +1161,16 @@ class IssueSubscriberSerializer(BaseSerializer):
     class Meta:
         model = IssueSubscriber
         fields = "__all__"
-        read_only_fields = ["workspace", "project", "issue"]
+        read_only_fields = [
+            "workspace",
+            "project",
+            "issue",
+            "deleted_at",
+            "created_at",
+            "updated_at",
+            "created_by",
+            "updated_by",
+        ]
 
 
 class IssueVersionDetailSerializer(BaseSerializer):

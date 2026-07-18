@@ -4,7 +4,8 @@
  * See the LICENSE file for details.
  */
 
-import { makeObservable, observable } from "mobx";
+import { cloneDeep } from "lodash-es";
+import { makeObservable, observable, runInAction } from "mobx";
 import { computedFn } from "mobx-utils";
 // types
 import type { TIssue, TIssueServiceType } from "@plane/types";
@@ -31,6 +32,12 @@ export interface IIssueStoreActions {
     removeModuleIds: string[]
   ) => Promise<void>;
   removeIssueFromModule: (workspaceSlug: string, projectId: string, moduleId: string, issueId: string) => Promise<void>;
+  updateIssueSubscribers: (
+    workspaceSlug: string,
+    projectId: string,
+    issueId: string,
+    subscriberIds: string[]
+  ) => Promise<void>;
   fetchIssueWithIdentifier: (workspaceSlug: string, project_identifier: string, sequence_id: string) => Promise<TIssue>;
 }
 
@@ -101,9 +108,12 @@ export class IssueStore implements IIssueStore {
     // store handlers from issue detail
     // parent
     if (issue && issue?.parent && issue?.parent?.id && issue?.parent?.project_id) {
-      this.issueService.retrieve(workspaceSlug, issue.parent.project_id, issue?.parent?.id).then((res) => {
-        this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]);
-      });
+      try {
+        const parentIssue = await this.issueService.retrieve(workspaceSlug, issue.parent.project_id, issue?.parent?.id);
+        this.rootIssueDetailStore.rootIssueStore.issues.addIssue([parentIssue]);
+      } catch (error) {
+        console.error("Error fetching parent issue", error);
+      }
     }
     // assignees
     // labels
@@ -121,20 +131,20 @@ export class IssueStore implements IIssueStore {
     this.rootIssueDetailStore.addSubscription(issueId, issue.is_subscribed);
 
     // fetch issue activity
-    this.rootIssueDetailStore.activity.fetchActivities(workspaceSlug, projectId, issueId);
+    void this.rootIssueDetailStore.activity.fetchActivities(workspaceSlug, projectId, issueId);
 
     // fetch issue comments
-    this.rootIssueDetailStore.comment.fetchComments(workspaceSlug, projectId, issueId);
+    void this.rootIssueDetailStore.comment.fetchComments(workspaceSlug, projectId, issueId);
 
     // fetch sub issues
-    this.rootIssueDetailStore.subIssues.fetchSubIssues(workspaceSlug, projectId, issueId);
+    void this.rootIssueDetailStore.subIssues.fetchSubIssues(workspaceSlug, projectId, issueId);
 
     // fetch issue relations
-    this.rootIssueDetailStore.relation.fetchRelations(workspaceSlug, projectId, issueId);
+    void this.rootIssueDetailStore.relation.fetchRelations(workspaceSlug, projectId, issueId);
 
     // fetching states
     // TODO: check if this function is required
-    this.rootIssueDetailStore.rootIssueStore.rootStore.state.fetchProjectStates(workspaceSlug, projectId);
+    void this.rootIssueDetailStore.rootIssueStore.rootStore.state.fetchProjectStates(workspaceSlug, projectId);
 
     return issue;
   };
@@ -157,7 +167,10 @@ export class IssueStore implements IIssueStore {
       project_id: issue?.project_id,
       parent_id: issue?.parent_id,
       cycle_id: issue?.cycle_id,
+      cycle_ids: issue?.cycle_ids ?? [],
       module_ids: issue?.module_ids,
+      subscriber_ids: issue?.subscriber_ids,
+      mention_ids: issue?.mention_ids,
       type_id: issue?.type_id,
       created_at: issue?.created_at,
       updated_at: issue?.updated_at,
@@ -170,6 +183,7 @@ export class IssueStore implements IIssueStore {
       is_draft: issue?.is_draft,
       is_subscribed: issue?.is_subscribed,
       is_epic: issue?.is_epic,
+      is_private: issue?.is_private ?? false,
     };
 
     this.rootIssueDetailStore.rootIssueStore.issues.addIssue([issuePayload]);
@@ -195,7 +209,7 @@ export class IssueStore implements IIssueStore {
       this.serviceType === EIssueServiceType.EPICS
         ? this.rootIssueDetailStore.rootIssueStore.projectEpics
         : this.rootIssueDetailStore.rootIssueStore.projectIssues;
-    currentStore.removeIssue(workspaceSlug, projectId, issueId);
+    await currentStore.removeIssue(workspaceSlug, projectId, issueId);
   };
 
   archiveIssue = async (workspaceSlug: string, projectId: string, issueId: string) => {
@@ -203,7 +217,7 @@ export class IssueStore implements IIssueStore {
       this.serviceType === EIssueServiceType.EPICS
         ? this.rootIssueDetailStore.rootIssueStore.projectEpics
         : this.rootIssueDetailStore.rootIssueStore.projectIssues;
-    currentStore.archiveIssue(workspaceSlug, projectId, issueId);
+    await currentStore.archiveIssue(workspaceSlug, projectId, issueId);
   };
 
   addCycleToIssue = async (workspaceSlug: string, projectId: string, cycleId: string, issueId: string) => {
@@ -267,6 +281,44 @@ export class IssueStore implements IIssueStore {
     return currentModule;
   };
 
+  updateIssueSubscribers = async (
+    workspaceSlug: string,
+    projectId: string,
+    issueId: string,
+    subscriberIds: string[]
+  ) => {
+    const uniqueSubscribers = Array.from(new Set(subscriberIds));
+    const issueBeforeUpdate = cloneDeep(this.rootIssueDetailStore.rootIssueStore.issues.getIssueById(issueId));
+    const currentSubscribers = issueBeforeUpdate?.subscriber_ids ?? [];
+
+    const toAdd = uniqueSubscribers.filter((id) => !currentSubscribers.includes(id));
+    const toRemove = currentSubscribers.filter((id) => !uniqueSubscribers.includes(id));
+
+    runInAction(() => {
+      this.rootIssueDetailStore.rootIssueStore.issues.updateIssue(issueId, { subscriber_ids: uniqueSubscribers });
+    });
+
+    try {
+      await Promise.all([
+        ...toAdd.map((subscriberId) =>
+          this.issueService.addIssueSubscriber(workspaceSlug, projectId, issueId, subscriberId)
+        ),
+        ...toRemove.map((subscriberId) =>
+          this.issueService.removeIssueSubscriber(workspaceSlug, projectId, issueId, subscriberId)
+        ),
+      ]);
+    } catch (error) {
+      if (issueBeforeUpdate) {
+        runInAction(() => {
+          this.rootIssueDetailStore.rootIssueStore.issues.updateIssue(issueId, {
+            subscriber_ids: currentSubscribers,
+          });
+        });
+      }
+      throw error;
+    }
+  };
+
   fetchIssueWithIdentifier = async (workspaceSlug: string, project_identifier: string, sequence_id: string) => {
     const query = {
       expand: "issue_reactions,issue_attachments,issue_link,parent",
@@ -286,9 +338,12 @@ export class IssueStore implements IIssueStore {
 
     // handle parent issue if exists
     if (issue?.parent && issue?.parent?.id && issue?.parent?.project_id) {
-      this.issueService.retrieve(workspaceSlug, issue.parent.project_id, issue.parent.id).then((res) => {
-        this.rootIssueDetailStore.rootIssueStore.issues.addIssue([res]);
-      });
+      try {
+        const parentIssue = await this.issueService.retrieve(workspaceSlug, issue.parent.project_id, issue.parent.id);
+        this.rootIssueDetailStore.rootIssueStore.issues.addIssue([parentIssue]);
+      } catch (error) {
+        console.error("Error fetching parent issue by identifier", error);
+      }
     }
 
     // add identifiers to map
@@ -313,20 +368,20 @@ export class IssueStore implements IIssueStore {
     rootWorkItemDetailStore.addSubscription(issueId, issue.is_subscribed);
 
     // fetch issue activity
-    rootWorkItemDetailStore.activity.fetchActivities(workspaceSlug, projectId, issueId);
+    void rootWorkItemDetailStore.activity.fetchActivities(workspaceSlug, projectId, issueId);
 
     // fetch issue comments
-    rootWorkItemDetailStore.comment.fetchComments(workspaceSlug, projectId, issueId);
+    void rootWorkItemDetailStore.comment.fetchComments(workspaceSlug, projectId, issueId);
 
     // fetch sub issues
-    rootWorkItemDetailStore.subIssues.fetchSubIssues(workspaceSlug, projectId, issueId);
+    void rootWorkItemDetailStore.subIssues.fetchSubIssues(workspaceSlug, projectId, issueId);
 
     // fetch issue relations
-    rootWorkItemDetailStore.relation.fetchRelations(workspaceSlug, projectId, issueId);
+    void rootWorkItemDetailStore.relation.fetchRelations(workspaceSlug, projectId, issueId);
 
     // fetching states
     // TODO: check if this function is required
-    rootWorkItemDetailStore.rootIssueStore.rootStore.state.fetchProjectStates(workspaceSlug, projectId);
+    void rootWorkItemDetailStore.rootIssueStore.rootStore.state.fetchProjectStates(workspaceSlug, projectId);
 
     return issue;
   };

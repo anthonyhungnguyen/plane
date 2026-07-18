@@ -5,6 +5,7 @@
  */
 
 import { action, computed, makeObservable, observable } from "mobx";
+import { IS_WORK_ITEM_DELETE_ENABLED } from "@plane/constants";
 // types
 import type {
   TIssue,
@@ -245,7 +246,13 @@ export class IssueDetail implements IIssueDetail {
   toggleCreateIssueModal = (value: boolean) => (this.isCreateIssueModalOpen = value);
   toggleIssueLinkModal = (value: boolean) => (this.isIssueLinkModalOpen = value);
   toggleParentIssueModal = (issueId: string | null) => (this.isParentIssueModalOpen = issueId);
-  toggleDeleteIssueModal = (issueId: string | null) => (this.isDeleteIssueModalOpen = issueId);
+  toggleDeleteIssueModal = (issueId: string | null) => {
+    if (!IS_WORK_ITEM_DELETE_ENABLED) {
+      this.isDeleteIssueModalOpen = null;
+      return;
+    }
+    this.isDeleteIssueModalOpen = issueId;
+  };
   toggleArchiveIssueModal = (issueId: string | null) => (this.isArchiveIssueModalOpen = issueId);
   toggleRelationModal = (issueId: string | null, relationType: TIssueRelationTypes | null) =>
     (this.isRelationModalOpen = { issueId, relationType });
@@ -291,6 +298,8 @@ export class IssueDetail implements IIssueDetail {
   ) => this.issue.changeModulesInIssue(workspaceSlug, projectId, issueId, addModuleIds, removeModuleIds);
   removeIssueFromModule = async (workspaceSlug: string, projectId: string, moduleId: string, issueId: string) =>
     this.issue.removeIssueFromModule(workspaceSlug, projectId, moduleId, issueId);
+  updateIssueSubscribers = async (workspaceSlug: string, projectId: string, issueId: string, subscriberIds: string[]) =>
+    this.issue.updateIssueSubscribers(workspaceSlug, projectId, issueId, subscriberIds);
 
   // reactions
   addReactions = (issueId: string, reactions: TIssueReaction[]) => this.reaction.addReactions(issueId, reactions);

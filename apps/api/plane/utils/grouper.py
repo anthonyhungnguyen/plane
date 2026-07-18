@@ -11,6 +11,7 @@ from django.db.models.functions import Coalesce
 # Module imports
 from plane.db.models import (
     Cycle,
+    CycleIssue,
     Issue,
     Label,
     Module,
@@ -74,10 +75,18 @@ def issue_queryset_grouper(
         .values("arr")
     )
 
+    issue_cycle_subquery = Subquery(
+        CycleIssue.objects.filter(issue_id=OuterRef("pk"), deleted_at__isnull=True)
+        .values("issue_id")
+        .annotate(arr=ArrayAgg("cycle_id", distinct=True))
+        .values("arr")
+    )
+
     annotations_map: Dict[str, Tuple[str, Q]] = {
         "assignee_ids": Coalesce(issue_assignee_subquery, Value([], output_field=ArrayField(UUIDField()))),
         "label_ids": Coalesce(issue_label_subquery, Value([], output_field=ArrayField(UUIDField()))),
         "module_ids": Coalesce(issue_module_subquery, Value([], output_field=ArrayField(UUIDField()))),
+        "cycle_ids": Coalesce(issue_cycle_subquery, Value([], output_field=ArrayField(UUIDField()))),
     }
 
     default_annotations: Dict[str, Any] = {}
@@ -101,7 +110,7 @@ def issue_on_results(
         "issue_module__module_id": "module_ids",
     }
 
-    original_list: List[str] = ["assignee_ids", "label_ids", "module_ids"]
+    original_list: List[str] = ["assignee_ids", "label_ids", "module_ids", "cycle_ids"]
 
     required_fields: List[str] = [
         "id",
@@ -117,6 +126,7 @@ def issue_on_results(
         "project_id",
         "parent_id",
         "cycle_id",
+        "cycle_ids",
         "sub_issues_count",
         "created_at",
         "updated_at",

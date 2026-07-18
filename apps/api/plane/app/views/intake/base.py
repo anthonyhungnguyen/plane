@@ -52,6 +52,13 @@ from plane.utils.timezone_converter import user_timezone_converter
 from plane.utils.global_paginator import paginate
 from plane.utils.host import base_host
 from plane.db.models.intake import SourceType
+from plane.utils.issue_annotations import (
+    cycle_ids_subquery,
+    mention_ids_agg,
+    mention_ids_subquery,
+    subscriber_ids_agg,
+    subscriber_ids_subquery,
+)
 
 
 class IntakeViewSet(BaseViewSet):
@@ -114,8 +121,13 @@ class IntakeIssueViewSet(BaseViewSet):
             )
             .annotate(
                 cycle_id=Subquery(
-                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
+                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True)
+                    .order_by("created_at")
+                    .values("cycle_id")[:1]
                 )
+            )
+            .annotate(
+                cycle_ids=cycle_ids_subquery()
             )
             .annotate(
                 link_count=IssueLink.objects.filter(issue=OuterRef("id"))
@@ -551,6 +563,10 @@ class IntakeIssueViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=Issue)
     def destroy(self, request, slug, project_id, pk):
+        return Response(
+            {"error": "Work item deletion is disabled."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
         intake_id = Intake.objects.filter(workspace__slug=slug, project_id=project_id).first()
         intake_issue = IntakeIssue.objects.get(
             issue_id=pk,

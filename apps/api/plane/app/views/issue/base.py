@@ -55,6 +55,7 @@ from plane.db.models import (
     IssueReaction,
     IssueRelation,
     IssueSubscriber,
+    IssueMention,
     ProjectUserProperty,
     ModuleIssue,
     Project,
@@ -73,6 +74,14 @@ from plane.utils.issue_filters import issue_filters
 from plane.utils.order_queryset import order_issue_queryset
 from plane.utils.paginator import GroupedOffsetPaginator, SubGroupedOffsetPaginator
 from plane.utils.timezone_converter import user_timezone_converter
+from plane.utils.issue_annotations import (
+    cycle_ids_subquery,
+    mention_ids_agg,
+    mention_ids_subquery,
+    subscriber_ids_agg,
+    subscriber_ids_subquery,
+)
+from plane.utils.issue_visibility import issue_visibility_filter, user_has_issue_access
 
 from .. import BaseAPIView, BaseViewSet
 
@@ -92,6 +101,7 @@ class IssueListEndpoint(BaseAPIView):
 
         # Base queryset with basic filters
         queryset = Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id, pk__in=issue_ids)
+        queryset = queryset.filter(issue_visibility_filter(request.user))
 
         # Restrict guests without full feature access to issues they created,
         # mirroring IssueViewSet.list.
@@ -123,8 +133,13 @@ class IssueListEndpoint(BaseAPIView):
         issue_queryset = (
             issue_queryset.annotate(
                 cycle_id=Subquery(
-                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
+                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True)
+                    .order_by("created_at")
+                    .values("cycle_id")[:1]
                 )
+            )
+            .annotate(
+                cycle_ids=cycle_ids_subquery()
             )
             .annotate(
                 link_count=IssueLink.objects.filter(issue=OuterRef("id"))
@@ -146,6 +161,9 @@ class IssueListEndpoint(BaseAPIView):
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
+            )
+            .annotate(
+                mention_ids=mention_ids_agg()
             )
             .distinct()
         )
@@ -186,9 +204,11 @@ class IssueListEndpoint(BaseAPIView):
                 "project_id",
                 "parent_id",
                 "cycle_id",
+                "cycle_ids",
                 "module_ids",
                 "label_ids",
                 "assignee_ids",
+                "mention_ids",
                 "sub_issues_count",
                 "created_at",
                 "updated_at",
@@ -227,8 +247,13 @@ class IssueViewSet(BaseViewSet):
         issues = (
             issues.annotate(
                 cycle_id=Subquery(
-                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
+                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True)
+                    .order_by("created_at")
+                    .values("cycle_id")[:1]
                 )
+            )
+            .annotate(
+                cycle_ids=cycle_ids_subquery()
             )
             .annotate(
                 link_count=Subquery(
@@ -451,6 +476,7 @@ class IssueViewSet(BaseViewSet):
                     "project_id",
                     "parent_id",
                     "cycle_id",
+                    "cycle_ids",
                     "module_ids",
                     "label_ids",
                     "assignee_ids",
@@ -500,7 +526,16 @@ class IssueViewSet(BaseViewSet):
                 pk=pk,
             )
             .select_related("state")
-            .annotate(cycle_id=Subquery(CycleIssue.objects.filter(issue=OuterRef("id")).values("cycle_id")[:1]))
+            .annotate(
+                cycle_id=Subquery(
+                    CycleIssue.objects.filter(issue=OuterRef("id"))
+                    .order_by("created_at")
+                    .values("cycle_id")[:1]
+                )
+            )
+            .annotate(
+                cycle_ids=cycle_ids_subquery()
+            )
             .annotate(
                 link_count=Subquery(
                     IssueLink.objects.filter(issue=OuterRef("id"))
@@ -562,6 +597,8 @@ class IssueViewSet(BaseViewSet):
                     ),
                     Value([], output_field=ArrayField(UUIDField())),
                 ),
+                subscriber_ids=subscriber_ids_subquery(),
+                mention_ids=mention_ids_subquery(),
             )
             .prefetch_related(
                 Prefetch(
@@ -654,6 +691,8 @@ class IssueViewSet(BaseViewSet):
                     ),
                     Value([], output_field=ArrayField(UUIDField())),
                 ),
+                subscriber_ids=subscriber_ids_agg(),
+                mention_ids=mention_ids_agg(),
                 module_ids=Coalesce(
                     ArrayAgg(
                         "issue_module__module_id",
@@ -715,6 +754,10 @@ class IssueViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN], creator=True, model=Issue)
     def destroy(self, request, slug, project_id, pk=None):
+        return Response(
+            {"error": "Work item deletion is disabled."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
         issue = Issue.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
 
         issue.delete()
@@ -773,6 +816,10 @@ class ProjectUserDisplayPropertyEndpoint(BaseAPIView):
 class BulkDeleteIssuesEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN])
     def delete(self, request, slug, project_id):
+        return Response(
+            {"error": "Work item deletion is disabled."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
         issue_ids = request.data.get("issue_ids", [])
 
         if not len(issue_ids):
@@ -822,7 +869,14 @@ class IssuePaginatedViewSet(BaseViewSet):
 
         return (
             issue_queryset.select_related("state")
-            .annotate(cycle_id=Subquery(CycleIssue.objects.filter(issue=OuterRef("id")).values("cycle_id")[:1]))
+            .annotate(
+                cycle_id=Subquery(
+                    CycleIssue.objects.filter(issue=OuterRef("id")).order_by("created_at").values("cycle_id")[:1]
+                )
+            )
+            .annotate(
+                cycle_ids=cycle_ids_subquery()
+            )
             .annotate(
                 link_count=Subquery(
                     IssueLink.objects.filter(issue=OuterRef("id"))
@@ -892,6 +946,7 @@ class IssuePaginatedViewSet(BaseViewSet):
             "module_ids",
             "label_ids",
             "assignee_ids",
+            "mention_ids",
             "link_count",
             "attachment_count",
             "sub_issues_count",
@@ -958,6 +1013,7 @@ class IssuePaginatedViewSet(BaseViewSet):
                 ),
                 Value([], output_field=ArrayField(UUIDField())),
             ),
+            mention_ids=mention_ids_subquery(),
         )
 
         paginated_data = paginate(
@@ -980,8 +1036,13 @@ class IssueDetailEndpoint(BaseAPIView):
         return (
             issues.annotate(
                 cycle_id=Subquery(
-                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
+                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True)
+                    .order_by("created_at")
+                    .values("cycle_id")[:1]
                 )
+            )
+            .annotate(
+                cycle_ids=cycle_ids_subquery()
             )
             .annotate(
                 link_count=IssueLink.objects.filter(issue=OuterRef("id"))
@@ -1058,6 +1119,8 @@ class IssueDetailEndpoint(BaseAPIView):
         issue = Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id).filter(
             Exists(permission_subquery)
         )
+        issue = issue.filter(issue_visibility_filter(request.user))
+        issue = issue.filter(issue_visibility_filter(request.user))
 
         # Add additional prefetch based on expand parameter
         if self.expand:
@@ -1189,6 +1252,8 @@ class IssueMetaEndpoint(BaseAPIView):
         issue = Issue.issue_objects.only("sequence_id", "project__identifier").get(
             id=issue_id, project_id=project_id, workspace__slug=slug
         )
+        if not user_has_issue_access(request.user, issue):
+            return Response({"error": "Issue access denied"}, status=status.HTTP_403_FORBIDDEN)
         return Response(
             {
                 "sequence_id": issue.sequence_id,
@@ -1235,7 +1300,14 @@ class IssueDetailIdentifierEndpoint(BaseAPIView):
             .filter(workspace__slug=slug)
             .select_related("workspace", "project", "state", "parent")
             .prefetch_related("assignees", "labels", "issue_module__module")
-            .annotate(cycle_id=Subquery(CycleIssue.objects.filter(issue=OuterRef("id")).values("cycle_id")[:1]))
+            .annotate(
+                cycle_id=Subquery(
+                    CycleIssue.objects.filter(issue=OuterRef("id")).order_by("created_at").values("cycle_id")[:1]
+                )
+            )
+            .annotate(
+                cycle_ids=cycle_ids_subquery()
+            )
             .annotate(
                 link_count=IssueLink.objects.filter(issue=OuterRef("id"))
                 .order_by()
@@ -1332,6 +1404,9 @@ class IssueDetailIdentifierEndpoint(BaseAPIView):
                 {"error": "The required object does not exist."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        if not user_has_issue_access(request.user, issue):
+            return Response({"error": "Issue access denied"}, status=status.HTTP_403_FORBIDDEN)
 
         """
         if the role is guest and guest_view_all_features is false and owned by is not

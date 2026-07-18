@@ -10,7 +10,7 @@ from rest_framework import status
 from .. import BaseViewSet
 from plane.app.serializers import IssueSubscriberSerializer, ProjectMemberLiteSerializer
 from plane.app.permissions import ProjectEntityPermission, ProjectLitePermission
-from plane.db.models import IssueSubscriber, ProjectMember
+from plane.db.models import Issue, IssueActivity, IssueSubscriber, ProjectMember, User
 
 
 class IssueSubscriberViewSet(BaseViewSet):
@@ -28,9 +28,16 @@ class IssueSubscriberViewSet(BaseViewSet):
         return super(IssueSubscriberViewSet, self).get_permissions()
 
     def perform_create(self, serializer):
-        serializer.save(
+        subscriber = serializer.save(
             project_id=self.kwargs.get("project_id"),
             issue_id=self.kwargs.get("issue_id"),
+        )
+        self.log_subscription_activity(
+            issue_id=self.kwargs.get("issue_id"),
+            project_id=self.kwargs.get("project_id"),
+            subscriber_id=subscriber.subscriber_id,
+            actor_id=self.request.user.id,
+            verb="added",
         )
 
     def get_queryset(self):
@@ -63,6 +70,13 @@ class IssueSubscriberViewSet(BaseViewSet):
             workspace__slug=slug,
             issue=issue_id,
         )
+        self.log_subscription_activity(
+            issue_id=issue_id,
+            project_id=project_id,
+            subscriber_id=issue_subscriber.subscriber_id,
+            actor_id=request.user.id,
+            verb="removed",
+        )
         issue_subscriber.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -82,6 +96,13 @@ class IssueSubscriberViewSet(BaseViewSet):
             issue_id=issue_id, subscriber_id=request.user.id, project_id=project_id
         )
         serializer = IssueSubscriberSerializer(subscriber)
+        self.log_subscription_activity(
+            issue_id=issue_id,
+            project_id=project_id,
+            subscriber_id=request.user.id,
+            actor_id=request.user.id,
+            verb="added",
+        )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def unsubscribe(self, request, slug, project_id, issue_id):
@@ -90,6 +111,13 @@ class IssueSubscriberViewSet(BaseViewSet):
             subscriber=request.user,
             workspace__slug=slug,
             issue=issue_id,
+        )
+        self.log_subscription_activity(
+            issue_id=issue_id,
+            project_id=project_id,
+            subscriber_id=request.user.id,
+            actor_id=request.user.id,
+            verb="removed",
         )
         issue_subscriber.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -102,3 +130,24 @@ class IssueSubscriberViewSet(BaseViewSet):
             project=project_id,
         ).exists()
         return Response({"subscribed": issue_subscriber}, status=status.HTTP_200_OK)
+
+    def log_subscription_activity(self, issue_id, project_id, subscriber_id, actor_id, verb: str):
+        try:
+            issue = Issue.objects.get(pk=issue_id)
+            subscriber = User.objects.get(pk=subscriber_id)
+        except (Issue.DoesNotExist, User.DoesNotExist):
+            return
+
+        IssueActivity.objects.create(
+            issue_id=issue_id,
+            project_id=project_id,
+            workspace_id=issue.workspace_id,
+            actor_id=actor_id,
+            verb="updated",
+            field="subscription",
+            comment="added a subscriber" if verb == "added" else "removed a subscriber",
+            new_value=subscriber.display_name if verb == "added" else None,
+            old_value=subscriber.display_name if verb != "added" else None,
+            new_identifier=subscriber.id if verb == "added" else None,
+            old_identifier=subscriber.id if verb != "added" else None,
+        )

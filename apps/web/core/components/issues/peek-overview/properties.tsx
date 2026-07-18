@@ -5,6 +5,7 @@
  */
 
 import { observer } from "mobx-react";
+import { AtSign, Bell, Lock } from "lucide-react";
 // i18n
 import { useTranslation } from "@plane/i18n";
 // ui icons
@@ -35,10 +36,12 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useMember } from "@/hooks/store/use-member";
 import { useProject } from "@/hooks/store/use-project";
 import { useProjectState } from "@/hooks/store/use-project-state";
+// ui
+import { ToggleSwitch } from "@plane/ui";
 // plane web components
 import { IssueParentSelectRoot } from "@/components/issues/parent-select-root";
 import type { TIssueOperations } from "../issue-detail";
-import { IssueCycleSelect } from "../issue-detail/cycle-select";
+import { IssueAdditionalCyclesSelect, IssueCycleSelect } from "../issue-detail/cycle-select";
 import { IssueLabel } from "../issue-detail/label";
 import { IssueModuleSelect } from "../issue-detail/module-select";
 
@@ -81,7 +84,7 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
         <SidebarPropertyListItem icon={StatePropertyIcon} label={t("common.state")}>
           <StateDropdown
             value={issue?.state_id}
-            onChange={(val) => issueOperations.update(workspaceSlug, projectId, issueId, { state_id: val })}
+            onChange={(val) => void issueOperations.update(workspaceSlug, projectId, issueId, { state_id: val })}
             projectId={projectId}
             disabled={disabled}
             buttonVariant="transparent-with-text"
@@ -93,14 +96,27 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
           />
         </SidebarPropertyListItem>
 
+        <SidebarPropertyListItem icon={Lock} label={t("common.access.private")}>
+          <div className="flex w-full items-center justify-between gap-2 rounded px-2">
+            <ToggleSwitch
+              size="sm"
+              value={!!issue.is_private}
+              disabled={disabled}
+              onChange={(val) => void issueOperations.update(workspaceSlug, projectId, issueId, { is_private: val })}
+            />
+            <span className="text-xs text-custom-text-400">{issue.is_private ? t("common.yes") : t("common.no")}</span>
+          </div>
+        </SidebarPropertyListItem>
+
         <SidebarPropertyListItem icon={MembersPropertyIcon} label={t("common.assignees")}>
           <MemberDropdown
             value={issue?.assignee_ids ?? undefined}
-            onChange={(val) => issueOperations.update(workspaceSlug, projectId, issueId, { assignee_ids: val })}
+            onChange={(val) => void issueOperations.update(workspaceSlug, projectId, issueId, { assignee_ids: val })}
             disabled={disabled}
             projectId={projectId}
             placeholder={t("issue.add.assignee")}
             multiple
+            selectionLimit={1}
             buttonVariant={issue?.assignee_ids?.length > 1 ? "transparent-without-text" : "transparent-with-text"}
             className="group w-full grow"
             buttonContainerClassName="w-full text-left h-7.5"
@@ -111,10 +127,50 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
           />
         </SidebarPropertyListItem>
 
+        <SidebarPropertyListItem icon={Bell} label={t("common.subscribers")}>
+          <MemberDropdown
+            value={issue?.subscriber_ids ?? []}
+            onChange={(val) =>
+              issueOperations.updateSubscribers &&
+              void issueOperations.updateSubscribers(workspaceSlug, projectId, issueId, val ?? [])
+            }
+            disabled={disabled || !issueOperations.updateSubscribers}
+            projectId={projectId}
+            placeholder={t("common.subscribers")}
+            multiple
+            buttonVariant={
+              issue?.subscriber_ids && issue.subscriber_ids.length > 1
+                ? "transparent-without-text"
+                : "transparent-with-text"
+            }
+            className="w-full grow group"
+            buttonContainerClassName="w-full text-left h-7.5"
+            buttonClassName={`text-body-xs-regular justify-between ${
+              issue?.subscriber_ids && issue.subscriber_ids.length > 0 ? "" : "text-placeholder"
+            }`}
+            hideIcon={issue.subscriber_ids?.length === 0}
+            dropdownArrow
+            dropdownArrowClassName="h-3.5 w-3.5 hidden group-hover:inline"
+          />
+        </SidebarPropertyListItem>
+
+        <SidebarPropertyListItem icon={AtSign} label={t("common.mentions")}>
+          <div className="flex w-full items-center justify-between rounded px-2 text-body-xs-regular text-tertiary">
+            {issue?.mention_ids && issue.mention_ids.length > 0 ? (
+              <>
+                <ButtonAvatars showTooltip={false} userIds={issue.mention_ids} size="sm" />
+                <span className="ml-2 whitespace-nowrap">{issue.mention_ids.length}</span>
+              </>
+            ) : (
+              <span>{t("common.none")}</span>
+            )}
+          </div>
+        </SidebarPropertyListItem>
+
         <SidebarPropertyListItem icon={PriorityPropertyIcon} label={t("common.priority")}>
           <PriorityDropdown
             value={issue?.priority}
-            onChange={(val) => issueOperations.update(workspaceSlug, projectId, issueId, { priority: val })}
+            onChange={(val) => void issueOperations.update(workspaceSlug, projectId, issueId, { priority: val })}
             disabled={disabled}
             buttonVariant="transparent-with-text"
             className="h-7.5 w-full grow rounded-sm"
@@ -143,7 +199,7 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
           <DateDropdown
             value={issue.start_date}
             onChange={(val) =>
-              issueOperations.update(workspaceSlug, projectId, issueId, {
+              void issueOperations.update(workspaceSlug, projectId, issueId, {
                 start_date: val ? renderFormattedPayloadDate(val) : null,
               })
             }
@@ -164,7 +220,7 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
             <DateDropdown
               value={issue.target_date}
               onChange={(val) =>
-                issueOperations.update(workspaceSlug, projectId, issueId, {
+                void issueOperations.update(workspaceSlug, projectId, issueId, {
                   target_date: val ? renderFormattedPayloadDate(val) : null,
                 })
               }
@@ -188,7 +244,9 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
           <SidebarPropertyListItem icon={EstimatePropertyIcon} label={t("common.estimate")}>
             <EstimateDropdown
               value={issue.estimate_point ?? undefined}
-              onChange={(val) => issueOperations.update(workspaceSlug, projectId, issueId, { estimate_point: val })}
+              onChange={(val) =>
+                void issueOperations.update(workspaceSlug, projectId, issueId, { estimate_point: val })
+              }
               projectId={projectId}
               disabled={disabled}
               buttonVariant="transparent-with-text"
@@ -220,6 +278,19 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
           <SidebarPropertyListItem icon={CycleIcon} label={t("common.cycle")} appendElement={null}>
             <IssueCycleSelect
               className="h-7.5 w-full grow"
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              issueId={issueId}
+              issueOperations={issueOperations}
+              disabled={disabled}
+            />
+          </SidebarPropertyListItem>
+        )}
+
+        {projectDetails?.cycle_view && (
+          <SidebarPropertyListItem icon={CycleIcon} label={t("common.additional_cycles")}>
+            <IssueAdditionalCyclesSelect
+              className="w-full grow h-7.5"
               workspaceSlug={workspaceSlug}
               projectId={projectId}
               issueId={issueId}

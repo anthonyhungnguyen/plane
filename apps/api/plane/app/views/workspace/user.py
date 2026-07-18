@@ -9,6 +9,8 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 
 # Django imports
+from django.contrib.postgres.aggregates import ArrayAgg
+from django.contrib.postgres.fields import ArrayField
 from django.db.models import (
     Case,
     Count,
@@ -20,7 +22,9 @@ from django.db.models import (
     Value,
     When,
     Subquery,
+    UUIDField,
 )
+from django.db.models.functions import Coalesce
 from django.db.models.fields import DateField
 from django.db.models.functions import Cast, ExtractWeek
 from django.utils import timezone
@@ -63,6 +67,13 @@ from plane.utils.order_queryset import ACTIVITY_ORDER_BY_ALLOWLIST, order_issue_
 from plane.utils.paginator import GroupedOffsetPaginator, SubGroupedOffsetPaginator
 from plane.utils.filters import ComplexFilterBackend
 from plane.utils.filters import IssueFilterSet
+from plane.utils.issue_annotations import (
+    cycle_ids_subquery,
+    mention_ids_agg,
+    mention_ids_subquery,
+    subscriber_ids_agg,
+    subscriber_ids_subquery,
+)
 
 
 class UserLastProjectWithWorkspaceEndpoint(BaseAPIView):
@@ -105,8 +116,13 @@ class WorkspaceUserProfileIssuesEndpoint(BaseAPIView):
         return (
             issues.annotate(
                 cycle_id=Subquery(
-                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
+                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True)
+                    .order_by("created_at")
+                    .values("cycle_id")[:1]
                 )
+            )
+            .annotate(
+                cycle_ids=cycle_ids_subquery()
             )
             .annotate(
                 link_count=IssueLink.objects.filter(issue=OuterRef("id"))

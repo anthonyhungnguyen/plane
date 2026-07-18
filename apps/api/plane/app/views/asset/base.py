@@ -47,7 +47,14 @@ class FileAssetEndpoint(BaseAPIView):
 
     def delete(self, request, workspace_id, asset_key):
         asset_key = str(workspace_id) + "/" + asset_key
-        file_asset = FileAsset.objects.get(asset=asset_key)
+        try:
+            file_asset = FileAsset.objects.get(asset=asset_key)
+        except FileAsset.DoesNotExist:
+            return Response(
+                {"error": "Asset key does not exist", "status": False},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         file_asset.is_deleted = True
         file_asset.save(update_fields=["is_deleted"])
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -58,7 +65,14 @@ class FileAssetViewSet(BaseViewSet):
 
     def restore(self, request, workspace_id, asset_key):
         asset_key = str(workspace_id) + "/" + asset_key
-        file_asset = FileAsset.objects.get(asset=asset_key)
+        try:
+            file_asset = FileAsset.objects.get(asset=asset_key)
+        except FileAsset.DoesNotExist:
+            return Response(
+                {"error": "Asset key does not exist", "status": False},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         file_asset.is_deleted = False
         file_asset.save(update_fields=["is_deleted"])
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -86,7 +100,13 @@ class UserAssetsEndpoint(BaseAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, asset_key):
-        file_asset = FileAsset.objects.get(asset=asset_key, created_by=request.user)
+        try:
+            file_asset = FileAsset.objects.get(asset=asset_key, created_by=request.user)
+        except FileAsset.DoesNotExist:
+            return Response(
+                {"error": "Asset key does not exist", "status": False},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         file_asset.is_deleted = True
         file_asset.save(update_fields=["is_deleted"])
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -59,6 +59,7 @@ from plane.api.serializers import (
     LabelCreateUpdateSerializer,
     RelatedIssueSerializer,
 )
+from plane.utils.issue_visibility import issue_visibility_filter, user_has_issue_access
 from plane.app.permissions import (
     ProjectEntityPermission,
     ProjectLitePermission,
@@ -202,6 +203,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
             )
             .filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project__identifier=self.kwargs.get("project_identifier"))
+            .filter(issue_visibility_filter(self.request.user))
             .select_related("project")
             .select_related("workspace")
             .select_related("state")
@@ -247,6 +249,8 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
                 project__identifier=project_identifier,
                 sequence_id=issue_identifier,
             )
+            if not user_has_issue_access(request.user, issue):
+                return Response({"error": "Issue access denied"}, status=status.HTTP_403_FORBIDDEN)
             return Response(
                 IssueSerializer(issue, fields=self.fields, expand=self.expand).data,
                 status=status.HTTP_200_OK,
@@ -274,6 +278,7 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             )
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(workspace__slug=self.kwargs.get("slug"))
+            .filter(issue_visibility_filter(self.request.user))
             .select_related("project")
             .select_related("workspace")
             .select_related("state")
@@ -360,7 +365,9 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             self.get_queryset()
             .annotate(
                 cycle_id=Subquery(
-                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
+                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True)
+                    .order_by("created_at")
+                    .values("cycle_id")[:1]
                 )
             )
             .annotate(
@@ -380,7 +387,9 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
             )
         )
 
-        total_issue_queryset = Issue.issue_objects.filter(project_id=project_id, workspace__slug=slug)
+        total_issue_queryset = Issue.issue_objects.filter(project_id=project_id, workspace__slug=slug).filter(
+            issue_visibility_filter(self.request.user)
+        )
 
         # Priority Ordering
         if order_by_param == "priority" or order_by_param == "-priority":
@@ -541,6 +550,7 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             )
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(workspace__slug=self.kwargs.get("slug"))
+            .filter(issue_visibility_filter(self.request.user))
             .select_related("project")
             .select_related("workspace")
             .select_related("state")
@@ -585,6 +595,15 @@ class IssueDetailAPIEndpoint(BaseAPIView):
             .annotate(count=Func(F("id"), function="Count"))
             .values("count")
         ).get(workspace__slug=slug, project_id=project_id, pk=pk)
+        if not user_has_issue_access(request.user, issue):
+            return Response(
+                {
+                    "error": "You are not allowed to view this private issue",
+                    "is_private_issue": True,
+                    "status": status.HTTP_403_FORBIDDEN,
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         return Response(
             IssueSerializer(issue, fields=self.fields, expand=self.expand).data,
             status=status.HTTP_200_OK,
@@ -2280,7 +2299,7 @@ class IssueSearchEndpoint(BaseAPIView):
             project__project_projectmember__is_active=True,
             project__archived_at__isnull=True,
             workspace__slug=slug,
-        )
+        ).filter(issue_visibility_filter(self.request.user))
 
         # Apply project filter if not searching across workspace
         if workspace_search == "false" and project_id:

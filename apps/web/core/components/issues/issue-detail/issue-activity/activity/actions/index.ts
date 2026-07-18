@@ -23,6 +23,8 @@ export * from "./attachment";
 export * from "./archived-at";
 export * from "./inbox";
 export * from "./label-activity-chip";
+export * from "./subscription";
+export * from "./visibility";
 
 // helpers
 export * from "./helpers/activity-block";

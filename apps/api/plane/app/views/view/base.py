@@ -5,6 +5,8 @@
 import copy
 
 # Django imports
+from django.contrib.postgres.aggregates import ArrayAgg
+from django.contrib.postgres.fields import ArrayField
 from django.db.models import (
     Exists,
     F,
@@ -13,7 +15,10 @@ from django.db.models import (
     Q,
     Subquery,
     Prefetch,
+    UUIDField,
+    Value,
 )
+from django.db.models.functions import Coalesce
 from django.utils.decorators import method_decorator
 from django.views.decorators.gzip import gzip_page
 from django.db import transaction
@@ -47,6 +52,13 @@ from .. import BaseViewSet
 from plane.db.models import UserFavorite
 from plane.utils.filters import ComplexFilterBackend
 from plane.utils.filters import IssueFilterSet
+from plane.utils.issue_annotations import (
+    cycle_ids_subquery,
+    mention_ids_agg,
+    mention_ids_subquery,
+    subscriber_ids_agg,
+    subscriber_ids_subquery,
+)
 
 
 class WorkspaceViewViewSet(BaseViewSet):
@@ -171,8 +183,13 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
         return (
             issues.annotate(
                 cycle_id=Subquery(
-                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
+                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True)
+                    .order_by("created_at")
+                    .values("cycle_id")[:1]
                 )
+            )
+            .annotate(
+                cycle_ids=cycle_ids_subquery()
             )
             .annotate(
                 link_count=IssueLink.objects.filter(issue=OuterRef("id"))

@@ -475,6 +475,34 @@ def track_estimate_points(
         )
 
 
+def track_is_private(
+    requested_data,
+    current_instance,
+    issue_id,
+    project_id,
+    workspace_id,
+    actor_id,
+    issue_activities,
+    epoch,
+):
+    if current_instance.get("is_private") != requested_data.get("is_private"):
+        is_private = requested_data.get("is_private")
+        issue_activities.append(
+            IssueActivity(
+                issue_id=issue_id,
+                actor_id=actor_id,
+                verb="updated",
+                old_value=str(current_instance.get("is_private")),
+                new_value=str(is_private),
+                field="is_private",
+                project_id=project_id,
+                workspace_id=workspace_id,
+                comment="updated the visibility to private" if is_private else "made the work item visible to members",
+                epoch=epoch,
+            )
+        )
+
+
 def track_archive_at(
     requested_data,
     current_instance,
@@ -614,6 +642,7 @@ def update_issue_activity(
         "estimate_point": track_estimate_points,
         "archived_at": track_archive_at,
         "closed_to": track_closed_to,
+        "is_private": track_is_private,
         # External endpoint keys
         "parent": track_parent,
         "state": track_state,

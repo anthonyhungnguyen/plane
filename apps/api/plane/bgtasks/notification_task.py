@@ -154,6 +154,16 @@ def get_new_comment_mentions(new_value, old_value):
     return new_mentions
 
 
+def get_removed_comment_mentions(new_value, old_value):
+    mentions_newer = extract_comment_mentions(new_value)
+    if old_value is None:
+        return []
+
+    mentions_older = extract_comment_mentions(old_value)
+
+    return [mention for mention in mentions_older if mention not in mentions_newer]
+
+
 def create_mention_notification(project, notification_comment, issue, actor_id, mention_id, issue_id, activity):
     return Notification(
         workspace=project.workspace,
@@ -239,6 +249,7 @@ def notifications(
 
             comment_mentions = []
             all_comment_mentions = []
+            comment_mentions_removed = []
 
             # Get New Subscribers from the mentions of the newer instance
             requested_mentions = extract_mentions(issue_instance=requested_data)
@@ -259,9 +270,18 @@ def notifications(
                         old_value=issue_comment_old_value,
                         new_value=issue_comment_new_value,
                     )
+                    removed_comment_mentions = get_removed_comment_mentions(
+                        old_value=issue_comment_old_value,
+                        new_value=issue_comment_new_value,
+                    )
+
                     comment_mentions = comment_mentions + new_comment_mentions
+                    comment_mentions_removed = comment_mentions_removed + removed_comment_mentions
                     comment_mentions = [
                         mention for mention in comment_mentions if UUID(mention) in set(project_members)
+                    ]
+                    comment_mentions_removed = [
+                        mention for mention in comment_mentions_removed if UUID(mention) in set(project_members)
                     ]
 
             comment_mention_subscribers = extract_mentions_as_subscribers(
@@ -457,6 +477,48 @@ def notifications(
                 batch_size=100,
                 ignore_conflicts=True,
             )
+
+            # Maintain mentions list with comment mentions
+            if comment_mentions:
+                IssueMention.objects.bulk_create(
+                    [
+                        IssueMention(
+                            mention_id=mention_id,
+                            issue=issue,
+                            project=project,
+                            workspace_id=project.workspace_id,
+                        )
+                        for mention_id in set(comment_mentions)
+                    ],
+                    batch_size=100,
+                    ignore_conflicts=True,
+                )
+
+            if comment_mentions_removed:
+                description_mentions = set(
+                    extract_mentions(json.dumps({"description_html": issue.description_html}))
+                    if issue and issue.description_html
+                    else []
+                )
+                for mention_id in set(comment_mentions_removed):
+                    if mention_id in description_mentions:
+                        continue
+
+                    if IssueComment.objects.filter(
+                        issue_id=issue_id,
+                        project_id=project_id,
+                        workspace_id=project.workspace_id,
+                        deleted_at__isnull=True,
+                        comment_html__icontains=str(mention_id),
+                    ).exists():
+                        continue
+
+                    IssueMention.objects.filter(
+                        issue=issue,
+                        project=project,
+                        workspace_id=project.workspace_id,
+                        mention_id=mention_id,
+                    ).delete()
 
             last_activity = IssueActivity.objects.filter(issue_id=issue_id).order_by("-created_at").first()
 

@@ -49,6 +49,12 @@ export type TIssueOperations = {
     addModuleIds: string[],
     removeModuleIds: string[]
   ) => Promise<void>;
+  updateSubscribers?: (
+    workspaceSlug: string,
+    projectId: string,
+    issueId: string,
+    subscriberIds: string[]
+  ) => Promise<void>;
 };
 
 export type TIssueDetailRoot = {
@@ -75,6 +81,7 @@ export const IssueDetailRoot = observer(function IssueDetailRoot(props: TIssueDe
     removeIssueFromCycle,
     changeModulesInIssue,
     removeIssueFromModule,
+    updateIssueSubscribers,
   } = useIssueDetail();
   const {
     issues: { removeIssue: removeArchivedIssue },
@@ -198,6 +205,9 @@ export const IssueDetailRoot = observer(function IssueDetailRoot(props: TIssueDe
         const promise = await changeModulesInIssue(workspaceSlug, projectId, issueId, addModuleIds, removeModuleIds);
         return promise;
       },
+      updateSubscribers: async (workspaceSlug: string, projectId: string, issueId: string, subscriberIds: string[]) => {
+        await updateIssueSubscribers(workspaceSlug, projectId, issueId, subscriberIds);
+      },
     }),
     [
       is_archived,
@@ -211,6 +221,7 @@ export const IssueDetailRoot = observer(function IssueDetailRoot(props: TIssueDe
       removeIssueFromCycle,
       changeModulesInIssue,
       removeIssueFromModule,
+      updateIssueSubscribers,
       t,
     ]
   );

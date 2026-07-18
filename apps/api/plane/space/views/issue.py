@@ -47,6 +47,7 @@ from plane.space.utils.grouper import (
 
 from plane.utils.order_queryset import order_issue_queryset
 from plane.utils.paginator import GroupedOffsetPaginator, SubGroupedOffsetPaginator
+from plane.utils.issue_visibility import issue_visibility_filter, user_has_issue_access
 from plane.app.serializers import (
     CommentReactionSerializer,
     IssueCommentSerializer,
@@ -86,6 +87,7 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
 
         issue_queryset = (
             Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id)
+            .filter(issue_visibility_filter(request.user))
             .select_related("workspace", "project", "state", "parent")
             .prefetch_related("assignees", "labels", "issue_module__module")
             .prefetch_related(
@@ -97,7 +99,9 @@ class ProjectIssuesPublicEndpoint(BaseAPIView):
             .prefetch_related(Prefetch("votes", queryset=IssueVote.objects.select_related("actor")))
             .annotate(
                 cycle_id=Subquery(
-                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
+                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True)
+                    .order_by("created_at")
+                    .values("cycle_id")[:1]
                 )
             )
             .annotate(
@@ -603,11 +607,14 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                 workspace__slug=deploy_board.workspace.slug,
                 project_id=deploy_board.project_id,
             )
+            .filter(issue_visibility_filter(request.user))
             .select_related("workspace", "project", "state", "parent")
             .prefetch_related("assignees", "labels", "issue_module__module")
             .annotate(
                 cycle_id=Subquery(
-                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
+                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True)
+                    .order_by("created_at")
+                    .values("cycle_id")[:1]
                 )
             )
             .annotate(
@@ -769,5 +776,15 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                 "reaction_items",
             )
         ).first()
+
+        if not user_has_issue_access(request.user, issue_queryset):
+            return Response(
+                {
+                    "error": "You are not allowed to view this private issue",
+                    "is_private_issue": True,
+                    "status": status.HTTP_403_FORBIDDEN,
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         return Response(issue_queryset, status=status.HTTP_200_OK)

@@ -61,6 +61,7 @@ export type TBaseIssue = {
   project_id: string | null;
   parent_id: string | null;
   cycle_id: string | null;
+  cycle_ids: string[] | null;
   module_ids: string[] | null;
   type_id: string | null;
 
@@ -75,6 +76,7 @@ export type TBaseIssue = {
   updated_by: string;
 
   is_draft: boolean;
+  is_private: boolean;
   is_epic?: boolean;
   is_intake?: boolean;
 };
@@ -90,6 +92,9 @@ type IssueRelation = {
 export type TIssue = TBaseIssue & {
   description_html?: string;
   is_subscribed?: boolean;
+  subscriber_ids?: string[];
+  mention_ids?: string[];
+  is_private?: boolean;
   parent?: Partial<TBaseIssue>;
   issue_reactions?: TIssueReaction[];
   issue_attachments?: TIssueAttachment[];
@@ -147,6 +152,7 @@ export type TBulkIssueProperties = Pick<
   | "target_date"
   | "module_ids"
   | "cycle_id"
+  | "cycle_ids"
   | "estimate_point"
 >;
 

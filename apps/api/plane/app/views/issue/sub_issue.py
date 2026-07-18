@@ -28,6 +28,13 @@ from plane.utils.timezone_converter import user_timezone_converter
 from collections import defaultdict
 from plane.utils.host import base_host
 from plane.utils.order_queryset import order_issue_queryset
+from plane.utils.issue_annotations import (
+    cycle_ids_subquery,
+    mention_ids_agg,
+    mention_ids_subquery,
+    subscriber_ids_agg,
+    subscriber_ids_subquery,
+)
 
 
 class SubIssuesEndpoint(BaseAPIView):
@@ -39,8 +46,13 @@ class SubIssuesEndpoint(BaseAPIView):
             Issue.issue_objects.filter(parent_id=issue_id, workspace__slug=slug)
             .annotate(
                 cycle_id=Subquery(
-                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
+                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True)
+                    .order_by("created_at")
+                    .values("cycle_id")[:1]
                 )
+            )
+            .annotate(
+                cycle_ids=cycle_ids_subquery()
             )
             .annotate(
                 link_count=Coalesce(

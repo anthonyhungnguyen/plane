@@ -8,7 +8,10 @@ import json
 
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import OuterRef, Q, Prefetch, Exists, Subquery, Count
+from django.contrib.postgres.aggregates import ArrayAgg
+from django.contrib.postgres.fields import ArrayField
+from django.db.models import OuterRef, Q, Prefetch, Exists, Subquery, Count, UUIDField, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.gzip import gzip_page
@@ -48,6 +51,13 @@ from plane.utils.host import base_host
 from .. import BaseViewSet, BaseAPIView
 from plane.utils.filters import ComplexFilterBackend
 from plane.utils.filters import IssueFilterSet
+from plane.utils.issue_annotations import (
+    cycle_ids_subquery,
+    mention_ids_agg,
+    mention_ids_subquery,
+    subscriber_ids_agg,
+    subscriber_ids_subquery,
+)
 
 
 class IssueArchiveViewSet(BaseViewSet):
@@ -61,8 +71,13 @@ class IssueArchiveViewSet(BaseViewSet):
         return (
             issues.annotate(
                 cycle_id=Subquery(
-                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
+                    CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True)
+                    .order_by("created_at")
+                    .values("cycle_id")[:1]
                 )
+            )
+            .annotate(
+                cycle_ids=cycle_ids_subquery()
             )
             .annotate(
                 link_count=Subquery(

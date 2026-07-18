@@ -43,7 +43,7 @@ export const IssuePeekOverview = observer(function IssuePeekOverview(props: IWor
   const {
     peekIssue,
     setPeekIssue,
-    issue: { fetchIssue },
+    issue: { fetchIssue, updateIssueSubscribers },
     fetchActivities,
   } = useIssueDetail();
   const issueStoreType = useIssueStoreType();
@@ -210,9 +210,12 @@ export const IssuePeekOverview = observer(function IssuePeekOverview(props: IWor
           console.error("Error removing issue from module", error);
         }
       },
+      updateSubscribers: async (workspaceSlug: string, projectId: string, issueId: string, subscriberIds: string[]) => {
+        await updateIssueSubscribers(workspaceSlug, projectId, issueId, subscriberIds);
+      },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fetchIssue, is_draft, issues, fetchActivities, pathname, removeRoutePeekId, restoreIssue]
+    [fetchIssue, is_draft, issues, fetchActivities, pathname, removeRoutePeekId, restoreIssue, updateIssueSubscribers]
   );
 
   const { isLoading } = useSWR(
