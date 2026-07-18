@@ -14,6 +14,7 @@ import giteaLogo from "@/app/assets/logos/gitea-logo.svg?url";
 import githubLightLogo from "@/app/assets/logos/github-black.png?url";
 import githubDarkLogo from "@/app/assets/logos/github-dark.svg?url";
 import gitlabLogo from "@/app/assets/logos/gitlab-logo.svg?url";
+import ghnLogo from "@/app/assets/logos/ghn-logo.png?url";
 import googleLogo from "@/app/assets/logos/google-logo.svg?url";
 // hooks
 import { useInstance } from "@/hooks/store/use-instance";
@@ -32,6 +33,7 @@ export const useCoreOAuthConfig = (oauthActionText: string): TOAuthConfigs => {
     (config &&
       (config?.is_google_enabled ||
         config?.is_github_enabled ||
+        config?.is_ghn_enabled ||
         config?.is_gitlab_enabled ||
         config?.is_gitea_enabled)) ||
     false;
@@ -44,6 +46,15 @@ export const useCoreOAuthConfig = (oauthActionText: string): TOAuthConfigs => {
         window.location.assign(`${API_BASE_URL}/auth/google/${next_path ? `?next_path=${next_path}` : ``}`);
       },
       enabled: config?.is_google_enabled,
+    },
+    {
+      id: "ghn",
+      text: `${oauthActionText} with GHN`,
+      icon: <img src={ghnLogo} height={18} width={18} className="object-contain" alt="GHN Logo" />,
+      onClick: () => {
+        window.location.assign(`${API_BASE_URL}/auth/ghn/${next_path ? `?next_path=${next_path}` : ``}`);
+      },
+      enabled: config?.is_ghn_enabled,
     },
     {
       id: "github",

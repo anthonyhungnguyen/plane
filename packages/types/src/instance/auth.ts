@@ -30,6 +30,7 @@ export type TInstanceAuthenticationMethodKeys =
   | "ENABLE_EMAIL_PASSWORD"
   | "IS_GOOGLE_ENABLED"
   | "IS_GITHUB_ENABLED"
+  | "IS_GHN_ENABLED"
   | "IS_GITLAB_ENABLED"
   | "IS_GITEA_ENABLED";
 
@@ -83,4 +84,4 @@ export type TOAuthConfigs = {
   oAuthOptions: TOAuthOption[];
 };
 
-export type TCoreLoginMediums = "email" | "magic-code" | "github" | "gitlab" | "google" | "gitea";
+export type TCoreLoginMediums = "email" | "magic-code" | "github" | "gitlab" | "google" | "gitea" | "ghn";

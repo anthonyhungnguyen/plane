@@ -306,6 +306,15 @@ class Adapter:
         user.save()
         return user
 
+    def resolve_user_for_login(self, email):
+        """Find the existing user for this login. Providers may override to
+        match by provider account id or username before falling back to email."""
+        return User.objects.filter(email=email).first()
+
+    def get_signup_username(self):
+        """Username for a newly signed-up user. Providers may override."""
+        return uuid.uuid4().hex
+
     def complete_login_or_signup(self):
         # Get email
         email = self.user_data.get("email")
@@ -314,7 +323,7 @@ class Adapter:
         email = self.sanitize_email(email)
 
         # Check if the user is present
-        user = User.objects.filter(email=email).first()
+        user = self.resolve_user_for_login(email)
 
         # Reject explicitly-deactivated accounts (GHSA-rmmf-rj2q-3rrg).
         # The deactivation endpoint always sets last_logout_time, so using it
@@ -351,7 +360,7 @@ class Adapter:
             self.__check_signup(email)
 
             # Initialize user
-            user = User(email=email, username=uuid.uuid4().hex)
+            user = User(email=email, username=self.get_signup_username())
 
             # Check if password is autoset
             if self.user_data.get("user").get("is_password_autoset"):

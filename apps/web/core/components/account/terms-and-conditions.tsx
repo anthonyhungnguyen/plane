@@ -14,31 +14,24 @@ interface TermsAndConditionsProps {
 
 // Constants for better maintainability
 const LEGAL_LINKS = {
-  termsOfService: "https://plane.so/legals/terms-and-conditions",
-  privacyPolicy: "https://plane.so/legals/privacy-policy",
-} as const;
-
-const MESSAGES = {
-  [EAuthModes.SIGN_UP]: "By creating an account",
-  [EAuthModes.SIGN_IN]: "By signing in",
+  termsOfService: "https://ghn.vn",
+  privacyPolicy: "https://ghn.vn",
 } as const;
 
 // Reusable link component to reduce duplication
-function LegalLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link href={href} className="text-secondary" target="_blank" rel="noopener noreferrer">
-      <span className="text-13 font-medium underline hover:cursor-pointer">{children}</span>
-    </Link>
-  );
-}
+const LegalLink: React.FC<{ href: string; children: React.ReactNode }> = ({ href, children }) => (
+  <Link href={href} className="text-accent-primary" target="_blank" rel="noopener noreferrer">
+    <span className="text-13 font-medium hover:underline">{children}</span>
+  </Link>
+);
 
 export function TermsAndConditions({ authType = EAuthModes.SIGN_IN }: TermsAndConditionsProps) {
   return (
     <div className="flex items-center justify-center">
-      <p className="text-center text-13 whitespace-pre-line text-tertiary">
-        {`${MESSAGES[authType]}, you understand and agree to \n our `}
-        <LegalLink href={LEGAL_LINKS.termsOfService}>Terms of Service</LegalLink> and{" "}
-        <LegalLink href={LEGAL_LINKS.privacyPolicy}>Privacy Policy</LegalLink>.
+      <p className="text-center text-13 text-tertiary whitespace-pre-line">
+        Bằng cách {authType === EAuthModes.SIGN_UP ? "tạo tài khoản" : "đăng nhập"}, bạn đồng ý với{" "}
+        <LegalLink href={LEGAL_LINKS.termsOfService}>Quy định</LegalLink> và{" "}
+        <LegalLink href={LEGAL_LINKS.privacyPolicy}>Chính sách bảo mật dữ liệu</LegalLink> của GHN.
       </p>
     </div>
   );

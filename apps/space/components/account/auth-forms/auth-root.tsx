@@ -43,6 +43,7 @@ export const AuthRoot = observer(function AuthRoot() {
   const [isPasswordAutoset, setIsPasswordAutoset] = useState(true);
   // hooks
   const { config } = useInstance();
+  const isGHNAuth = config?.is_ghn_enabled === true;
 
   useEffect(() => {
     if (error_code) {
@@ -91,59 +92,56 @@ export const AuthRoot = observer(function AuthRoot() {
   const handleEmailVerification = async (data: IEmailCheckData) => {
     setEmail(data.email);
 
-    await authService
-      .emailCheck(data)
-      .then(async (response) => {
-        let currentAuthMode: EAuthModes = response.existing ? EAuthModes.SIGN_IN : EAuthModes.SIGN_UP;
-        if (response.existing) {
-          currentAuthMode = EAuthModes.SIGN_IN;
-          setAuthMode(() => EAuthModes.SIGN_IN);
-        } else {
-          currentAuthMode = EAuthModes.SIGN_UP;
-          setAuthMode(() => EAuthModes.SIGN_UP);
-        }
+    try {
+      const response = await authService.emailCheck(data);
+      let currentAuthMode: EAuthModes = response.existing ? EAuthModes.SIGN_IN : EAuthModes.SIGN_UP;
+      if (response.existing) {
+        currentAuthMode = EAuthModes.SIGN_IN;
+        setAuthMode(() => EAuthModes.SIGN_IN);
+      } else {
+        currentAuthMode = EAuthModes.SIGN_UP;
+        setAuthMode(() => EAuthModes.SIGN_UP);
+      }
 
-        if (currentAuthMode === EAuthModes.SIGN_IN) {
-          if (isSMTPConfigured && isMagicLoginEnabled && response.status === "MAGIC_CODE") {
-            setAuthStep(EAuthSteps.UNIQUE_CODE);
-            generateEmailUniqueCode(data.email);
-          } else if (isEmailPasswordEnabled) {
-            setIsPasswordAutoset(false);
-            setAuthStep(EAuthSteps.PASSWORD);
-          } else {
-            const errorhandler = authErrorHandler("5005" as EAuthenticationErrorCodes);
-            setErrorInfo(errorhandler);
-          }
+      if (currentAuthMode === EAuthModes.SIGN_IN) {
+        if (isSMTPConfigured && isMagicLoginEnabled && response.status === "MAGIC_CODE") {
+          setAuthStep(EAuthSteps.UNIQUE_CODE);
+          await generateEmailUniqueCode(data.email);
+        } else if (isEmailPasswordEnabled) {
+          setIsPasswordAutoset(false);
+          setAuthStep(EAuthSteps.PASSWORD);
         } else {
-          if (isSMTPConfigured && isMagicLoginEnabled && response.status === "MAGIC_CODE") {
-            setAuthStep(EAuthSteps.UNIQUE_CODE);
-            generateEmailUniqueCode(data.email);
-          } else if (isEmailPasswordEnabled) {
-            setAuthStep(EAuthSteps.PASSWORD);
-          } else {
-            const errorhandler = authErrorHandler("5006" as EAuthenticationErrorCodes);
-            setErrorInfo(errorhandler);
-          }
+          const errorhandler = authErrorHandler("5005" as EAuthenticationErrorCodes);
+          setErrorInfo(errorhandler);
         }
-        return;
-      })
-      .catch((error) => {
-        const errorhandler = authErrorHandler(error?.error_code?.toString(), data?.email || undefined);
-        if (errorhandler?.type) setErrorInfo(errorhandler);
-      });
+      } else if (isSMTPConfigured && isMagicLoginEnabled && response.status === "MAGIC_CODE") {
+        setAuthStep(EAuthSteps.UNIQUE_CODE);
+        await generateEmailUniqueCode(data.email);
+      } else if (isEmailPasswordEnabled) {
+        setAuthStep(EAuthSteps.PASSWORD);
+      } else {
+        const errorhandler = authErrorHandler("5006" as EAuthenticationErrorCodes);
+        setErrorInfo(errorhandler);
+      }
+    } catch (error: unknown) {
+      const code = typeof error === "object" && error !== null ? (error as { error_code?: unknown }).error_code : "";
+      const errorhandler = authErrorHandler(String(code), data?.email || undefined);
+      if (errorhandler?.type) setErrorInfo(errorhandler);
+    }
   };
 
   // generating the unique code
   const generateEmailUniqueCode = async (email: string): Promise<{ code: string } | undefined> => {
     const payload = { email: email };
-    return await authService
-      .generateUniqueCode(payload)
-      .then(() => ({ code: "" }))
-      .catch((error) => {
-        const errorhandler = authErrorHandler(error?.error_code.toString());
-        if (errorhandler?.type) setErrorInfo(errorhandler);
-        throw error;
-      });
+    try {
+      await authService.generateUniqueCode(payload);
+      return { code: "" };
+    } catch (error: unknown) {
+      const code = typeof error === "object" && error !== null ? (error as { error_code?: unknown }).error_code : "";
+      const errorhandler = authErrorHandler(String(code));
+      if (errorhandler?.type) setErrorInfo(errorhandler);
+      throw error;
+    }
   };
 
   return (
@@ -153,10 +151,14 @@ export const AuthRoot = observer(function AuthRoot() {
           <AuthBanner bannerData={errorInfo} handleBannerData={(value) => setErrorInfo(value)} />
         )}
         <AuthHeader authMode={authMode} />
-        {isOAuthEnabled && <OAuthOptions options={oAuthOptions} compact={authStep === EAuthSteps.PASSWORD} />}
+        {isOAuthEnabled && (
+          <OAuthOptions options={oAuthOptions} compact={authStep === EAuthSteps.PASSWORD} showDivider={!isGHNAuth} />
+        )}
 
-        {authStep === EAuthSteps.EMAIL && <AuthEmailForm defaultEmail={email} onSubmit={handleEmailVerification} />}
-        {authStep === EAuthSteps.UNIQUE_CODE && (
+        {!isGHNAuth && authStep === EAuthSteps.EMAIL && (
+          <AuthEmailForm defaultEmail={email} onSubmit={handleEmailVerification} />
+        )}
+        {!isGHNAuth && authStep === EAuthSteps.UNIQUE_CODE && (
           <AuthUniqueCodeForm
             mode={authMode}
             email={email}
@@ -168,7 +170,7 @@ export const AuthRoot = observer(function AuthRoot() {
             generateEmailUniqueCode={generateEmailUniqueCode}
           />
         )}
-        {authStep === EAuthSteps.PASSWORD && (
+        {!isGHNAuth && authStep === EAuthSteps.PASSWORD && (
           <AuthPasswordForm
             mode={authMode}
             isPasswordAutoset={isPasswordAutoset}
@@ -180,8 +182,13 @@ export const AuthRoot = observer(function AuthRoot() {
               setAuthStep(EAuthSteps.EMAIL);
             }}
             handleAuthStep={(step: EAuthSteps) => {
-              if (step === EAuthSteps.UNIQUE_CODE) generateEmailUniqueCode(email);
-              setAuthStep(step);
+              const proceed = async () => {
+                if (step === EAuthSteps.UNIQUE_CODE) {
+                  await generateEmailUniqueCode(email);
+                }
+                setAuthStep(step);
+              };
+              void proceed();
             }}
           />
         )}

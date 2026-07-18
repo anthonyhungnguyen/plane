@@ -13,6 +13,7 @@ import { PlaneLockup } from "@plane/propel/icons";
 import { PageHead } from "@/components/core/page-title";
 import { EAuthModes } from "@/helpers/authentication.helper";
 import { useInstance } from "@/hooks/store/use-instance";
+import GHNLogo from "@/app/assets/logos/ghn-logo.png?url";
 
 const authContentMap = {
   [EAuthModes.SIGN_IN]: {
@@ -35,7 +36,6 @@ type AuthHeaderProps = {
 
 export const AuthHeader = observer(function AuthHeader({ type }: AuthHeaderProps) {
   const { t } = useTranslation();
-  // store
   const { config } = useInstance();
   // derived values
   const enableSignUpConfig = config?.enable_signup ?? false;
@@ -66,17 +66,23 @@ type TAuthHeaderBase = {
   additionalAction?: React.ReactNode;
 };
 
-export function AuthHeaderBase(props: TAuthHeaderBase) {
+export const AuthHeaderBase = observer(function AuthHeaderBase(props: TAuthHeaderBase) {
   const { pageTitle, additionalAction } = props;
+  const { config } = useInstance();
+  const isGHNAuth = config?.is_ghn_enabled === true;
   return (
     <>
       <PageHead title={pageTitle + " - Plane"} />
       <div className="sticky top-0 flex w-full flex-shrink-0 items-center justify-between gap-6">
         <Link href="/">
-          <PlaneLockup height={20} width={95} className="text-primary" />
+          {isGHNAuth ? (
+            <img src={GHNLogo} alt="GHN" className="h-15 w-auto" />
+          ) : (
+            <PlaneLockup height={20} width={95} className="text-primary" />
+          )}
         </Link>
         {additionalAction}
       </div>
     </>
   );
-}
+});

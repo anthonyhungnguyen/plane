@@ -52,6 +52,7 @@ class InstanceEndpoint(BaseAPIView):
             DISABLE_WORKSPACE_CREATION,
             IS_GOOGLE_ENABLED,
             IS_GITHUB_ENABLED,
+            IS_GHN_ENABLED,
             GITHUB_APP_NAME,
             IS_GITLAB_ENABLED,
             IS_GITEA_ENABLED,
@@ -80,6 +81,10 @@ class InstanceEndpoint(BaseAPIView):
                 {
                     "key": "IS_GITHUB_ENABLED",
                     "default": os.environ.get("IS_GITHUB_ENABLED", "0"),
+                },
+                {
+                    "key": "IS_GHN_ENABLED",
+                    "default": os.environ.get("IS_GHN_ENABLED", "0"),
                 },
                 {
                     "key": "GITHUB_APP_NAME",
@@ -131,6 +136,7 @@ class InstanceEndpoint(BaseAPIView):
         data["is_workspace_creation_disabled"] = DISABLE_WORKSPACE_CREATION == "1"
         data["is_google_enabled"] = IS_GOOGLE_ENABLED == "1"
         data["is_github_enabled"] = IS_GITHUB_ENABLED == "1"
+        data["is_ghn_enabled"] = IS_GHN_ENABLED == "1"
         data["is_gitlab_enabled"] = IS_GITLAB_ENABLED == "1"
         data["is_gitea_enabled"] = IS_GITEA_ENABLED == "1"
         data["is_magic_login_enabled"] = ENABLE_MAGIC_LINK_LOGIN == "1"

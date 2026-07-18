@@ -6,6 +6,7 @@
 
 import React from "react";
 import { AccentureLogo, DolbyLogo, SonyLogo, ZerodhaLogo } from "@plane/propel/icons";
+import { useInstance } from "@/hooks/store/use-instance";
 
 const BRAND_LOGOS: {
   id: string;
@@ -30,6 +31,11 @@ const BRAND_LOGOS: {
 ];
 
 export function AuthFooter() {
+  const { config } = useInstance();
+  const isGHNAuth = config?.is_ghn_enabled === true;
+
+  if (isGHNAuth) return null;
+
   return (
     <div className="flex flex-col items-center gap-6">
       <span className="text-13 whitespace-nowrap text-tertiary">Join 10,000+ teams building with Plane</span>

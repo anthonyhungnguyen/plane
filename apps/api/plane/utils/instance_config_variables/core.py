@@ -144,6 +144,15 @@ gitea_config_variables = [
     },
 ]
 
+ghn_config_variables = [
+    {
+        "key": "GHN_SSO_PRIMARY_EMAIL_FIELD",
+        "value": os.environ.get("GHN_SSO_PRIMARY_EMAIL_FIELD", "internal_email"),
+        "category": "GHN",
+        "is_encrypted": False,
+    },
+]
+
 smtp_config_variables = [
     {
         "key": "ENABLE_SMTP",
@@ -239,6 +248,7 @@ core_config_variables = [
     *github_config_variables,
     *gitlab_config_variables,
     *gitea_config_variables,
+    *ghn_config_variables,
     *smtp_config_variables,
     *llm_config_variables,
     *unsplash_config_variables,

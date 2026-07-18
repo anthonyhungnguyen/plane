@@ -34,6 +34,10 @@ from .views import (
     GitHubOauthInitiateSpaceEndpoint,
     GoogleCallbackSpaceEndpoint,
     GoogleOauthInitiateSpaceEndpoint,
+    GHNCallbackEndpoint,
+    GHNOauthInitiateEndpoint,
+    GHNCallbackSpaceEndpoint,
+    GHNOauthInitiateSpaceEndpoint,
     MagicGenerateSpaceEndpoint,
     MagicSignInSpaceEndpoint,
     MagicSignUpSpaceEndpoint,
@@ -88,6 +92,19 @@ urlpatterns = [
         "spaces/google/callback/",
         GoogleCallbackSpaceEndpoint.as_view(),
         name="space-google-callback",
+    ),
+    ## GHN Oauth
+    path("ghn/", GHNOauthInitiateEndpoint.as_view(), name="ghn-initiate"),
+    path("ghn/callback/", GHNCallbackEndpoint.as_view(), name="ghn-callback"),
+    path(
+        "spaces/ghn/",
+        GHNOauthInitiateSpaceEndpoint.as_view(),
+        name="space-ghn-initiate",
+    ),
+    path(
+        "spaces/ghn/callback/",
+        GHNCallbackSpaceEndpoint.as_view(),
+        name="space-ghn-callback",
     ),
     ## Github Oauth
     path("github/", GitHubOauthInitiateEndpoint.as_view(), name="github-initiate"),

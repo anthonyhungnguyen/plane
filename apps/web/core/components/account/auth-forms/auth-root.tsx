@@ -51,6 +51,7 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
   // derived values
   const oAuthActionText = authMode === EAuthModes.SIGN_UP ? "Sign up" : "Sign in";
   const { isOAuthEnabled, oAuthOptions } = useOAuthConfig(oAuthActionText);
+  const isGHNAuth = config?.is_ghn_enabled === true;
   const isEmailBasedAuthEnabled = config?.is_email_password_enabled || config?.is_magic_login_enabled;
   const noAuthMethodsAvailable = !isOAuthEnabled && !isEmailBasedAuthEnabled;
 
@@ -129,10 +130,10 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
         <OAuthOptions
           options={oAuthOptions}
           compact={authStep === EAuthSteps.PASSWORD}
-          showDivider={isEmailBasedAuthEnabled}
+          showDivider={isEmailBasedAuthEnabled && !isGHNAuth}
         />
       )}
-      {isEmailBasedAuthEnabled && (
+      {isEmailBasedAuthEnabled && !isGHNAuth && (
         <AuthFormRoot
           authStep={authStep}
           authMode={authMode}
