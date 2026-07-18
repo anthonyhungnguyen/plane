@@ -7,6 +7,7 @@
 import { MARKETING_PLANE_ONE_PAGE_LINK } from "@plane/constants";
 import { getButtonStyling } from "@plane/propel/button";
 import { cn } from "@plane/utils";
+import { IS_BILLING_FEATURE_ENABLED } from "@/helpers/feature-flags";
 
 type Props = {
   className?: string;
@@ -14,6 +15,8 @@ type Props = {
 
 export function BulkOperationsUpgradeBanner(props: Props) {
   const { className } = props;
+
+  if (!IS_BILLING_FEATURE_ENABLED) return null;
 
   return (
     <div className={cn("sticky bottom-0 left-0 z-[2] grid h-20 place-items-center px-3.5", className)}>

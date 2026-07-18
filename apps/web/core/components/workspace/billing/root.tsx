@@ -14,6 +14,8 @@ import { EProductSubscriptionEnum } from "@plane/types";
 // components
 import { SettingsBoxedControlItem } from "@/components/settings/boxed-control-item";
 import { SettingsHeading } from "@/components/settings/heading";
+// plane web helpers
+import { IS_BILLING_FEATURE_ENABLED } from "@/helpers/feature-flags";
 // local imports
 import { PlansComparison } from "./comparison/root";
 
@@ -42,6 +44,8 @@ export const BillingRoot = observer(function BillingRoot() {
    */
   const setBillingFrequency = (subscriptionType: EProductSubscriptionEnum, frequency: TBillingFrequency): void =>
     setProductBillingFrequency({ ...productBillingFrequency, [subscriptionType]: frequency });
+
+  if (!IS_BILLING_FEATURE_ENABLED) return null;
 
   return (
     <section className="relative scrollbar-hide size-full overflow-y-auto">

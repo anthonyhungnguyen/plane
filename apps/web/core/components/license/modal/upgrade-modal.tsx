@@ -21,6 +21,7 @@ import { cn } from "@plane/utils";
 // components
 import { FreePlanCard, PlanUpgradeCard } from "@/components/license";
 import type { TCheckoutParams } from "@/components/license/modal/card/checkout-button";
+import { IS_BILLING_FEATURE_ENABLED } from "@/helpers/feature-flags";
 
 // Constants
 const COMMON_CARD_CLASSNAME = "flex flex-col w-full h-full justify-end col-span-12 sm:col-span-6 xl:col-span-3";
@@ -36,6 +37,8 @@ export const PaidPlanUpgradeModal = observer(function PaidPlanUpgradeModal(props
   // derived values
   const isSelfHosted = true;
   const isTrialAllowed = false;
+
+  if (!IS_BILLING_FEATURE_ENABLED) return null;
 
   const handleRedirection = ({ planVariant, priceId }: TCheckoutParams) => {
     // Get the product and price using plane community constants

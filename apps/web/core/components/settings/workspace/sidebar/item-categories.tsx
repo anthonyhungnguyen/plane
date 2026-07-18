@@ -18,6 +18,8 @@ import { useTranslation } from "@plane/i18n";
 import { joinUrlPath } from "@plane/utils";
 // components
 import { SettingsSidebarItem } from "@/components/settings/sidebar/item";
+// helpers
+import { IS_BILLING_FEATURE_ENABLED } from "@/helpers/feature-flags";
 // hooks
 import { useUserPermissions } from "@/hooks/store/user";
 // local imports
@@ -36,8 +38,10 @@ export const WorkspaceSettingsSidebarItemCategories = observer(function Workspac
     <div className="mt-3 flex flex-col divide-y divide-subtle px-3">
       {WORKSPACE_SETTINGS_CATEGORIES.map((category) => {
         const categoryItems = GROUPED_WORKSPACE_SETTINGS[category];
-        const accessibleItems = categoryItems.filter((item) =>
-          allowPermissions(item.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug)
+        const accessibleItems = categoryItems.filter(
+          (item) =>
+            allowPermissions(item.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug) &&
+            (item.key !== "billing-and-plans" || IS_BILLING_FEATURE_ENABLED)
         );
 
         if (accessibleItems.length === 0) return null;

@@ -422,7 +422,7 @@ export const PLANS_COMPARISON_LIST: TPlansComparisonDetails[] = [
         },
       },
       {
-        title: "Intake Assignees",
+        title: "Intake Assignee",
         description: "Assign approved Intake work items to a member by\ndefault.",
         cloud: {
           free: false,

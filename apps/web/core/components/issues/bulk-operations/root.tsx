@@ -10,6 +10,7 @@ import { BulkOperationsUpgradeBanner } from "@/components/issues/bulk-operations
 // hooks
 import { useMultipleSelectStore } from "@/hooks/store/use-multiple-select-store";
 import type { TSelectionHelper } from "@/hooks/use-multiple-select";
+import { IS_BILLING_FEATURE_ENABLED } from "@/helpers/feature-flags";
 
 type Props = {
   className?: string;
@@ -21,7 +22,7 @@ export const IssueBulkOperationsRoot = observer(function IssueBulkOperationsRoot
   // store hooks
   const { isSelectionActive } = useMultipleSelectStore();
 
-  if (!isSelectionActive || selectionHelpers.isSelectionDisabled) return null;
+  if (!IS_BILLING_FEATURE_ENABLED || !isSelectionActive || selectionHelpers.isSelectionDisabled) return null;
 
   return <BulkOperationsUpgradeBanner className={className} />;
 });

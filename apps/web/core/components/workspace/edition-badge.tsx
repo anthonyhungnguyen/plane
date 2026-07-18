@@ -12,6 +12,8 @@ import { Tooltip } from "@plane/propel/tooltip";
 // hooks
 import { usePlatformOS } from "@/hooks/use-platform-os";
 import packageJson from "package.json";
+// helpers
+import { IS_BILLING_FEATURE_ENABLED } from "@/helpers/feature-flags";
 // local components
 import { Button } from "@plane/propel/button";
 import { PaidPlanUpgradeModal } from "@/components/license/modal/upgrade-modal";
@@ -23,6 +25,8 @@ export const WorkspaceEditionBadge = observer(function WorkspaceEditionBadge() {
   const { t } = useTranslation();
   // platform
   const { isMobile } = usePlatformOS();
+
+  if (!IS_BILLING_FEATURE_ENABLED) return null;
 
   return (
     <>

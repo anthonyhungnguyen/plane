@@ -7,6 +7,7 @@
 // helpers
 import { useTranslation } from "@plane/i18n";
 import { cn } from "@plane/utils";
+import { IS_BILLING_FEATURE_ENABLED } from "@/helpers/feature-flags";
 
 type TUpgradeBadge = {
   className?: string;
@@ -17,6 +18,8 @@ export function UpgradeBadge(props: TUpgradeBadge) {
   const { className, size = "sm" } = props;
 
   const { t } = useTranslation();
+
+  if (!IS_BILLING_FEATURE_ENABLED) return null;
 
   return (
     <div

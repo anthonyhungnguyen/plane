@@ -13,6 +13,7 @@ import { getButtonStyling } from "@plane/propel/button";
 import { SearchIcon } from "@plane/propel/icons";
 import { ContentWrapper } from "@plane/ui";
 import { cn } from "@plane/utils";
+import { IS_BILLING_FEATURE_ENABLED } from "@/helpers/feature-flags";
 // assets
 import ctaL1Dark from "@/app/assets/workspace-active-cycles/cta-l-1-dark.webp?url";
 import ctaL1Light from "@/app/assets/workspace-active-cycles/cta-l-1-light.webp?url";
@@ -74,6 +75,8 @@ export const WorkspaceActiveCyclesUpgrade = observer(function WorkspaceActiveCyc
   const {
     userProfile: { data: userProfile },
   } = useUser();
+
+  if (!IS_BILLING_FEATURE_ENABLED) return null;
 
   const isDarkMode = userProfile?.theme.theme === "dark";
 
