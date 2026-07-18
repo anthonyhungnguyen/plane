@@ -7,7 +7,7 @@
 import React, { useState } from "react";
 import { observer } from "mobx-react";
 // types
-import { PROJECT_ERROR_MESSAGES } from "@plane/constants";
+import { IS_WORK_ITEM_DELETE_ENABLED, PROJECT_ERROR_MESSAGES } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { TIssue } from "@plane/types";
@@ -35,6 +35,7 @@ export const DeleteInboxIssueModal = observer(function DeleteInboxIssueModal({
   // store hooks
   const { getProjectById } = useProject();
   const { t } = useTranslation();
+  if (!IS_WORK_ITEM_DELETE_ENABLED) return null;
   // derived values
   const projectDetails = data.project_id ? getProjectById(data?.project_id) : undefined;
 

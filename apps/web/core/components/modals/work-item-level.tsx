@@ -7,6 +7,7 @@
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // plane imports
+import { IS_WORK_ITEM_DELETE_ENABLED } from "@plane/constants";
 import type { TIssue } from "@plane/types";
 import { EIssueServiceType, EIssuesStoreType } from "@plane/types";
 // components
@@ -56,6 +57,7 @@ export const WorkItemLevelModals = observer(function WorkItemLevelModals(props: 
 
   // oxlint-disable-next-line no-shadow
   const handleDeleteIssue = async (workspaceSlug: string, projectId: string, issueId: string) => {
+    if (!IS_WORK_ITEM_DELETE_ENABLED) return;
     try {
       const isEpic = workItemDetails?.is_epic;
       const deleteAction = isEpic ? removeEpic : removeWorkItem;
@@ -90,22 +92,28 @@ export const WorkItemLevelModals = observer(function WorkItemLevelModals(props: 
         onSubmit={handleCreateIssueSubmit}
         allowedProjectIds={createWorkItemAllowedProjectIds}
       />
-      {workspaceSlug && workItemId && workItemDetails && workItemDetails.project_id && (
-        <DeleteIssueModal
-          handleClose={() => toggleDeleteIssueModal(false)}
-          isOpen={isDeleteIssueModalOpen}
-          data={workItemDetails}
-          onSubmit={() =>
-            handleDeleteIssue(workspaceSlug.toString(), workItemDetails.project_id!, workItemId?.toString())
-          }
-          isEpic={workItemDetails?.is_epic}
+      {IS_WORK_ITEM_DELETE_ENABLED &&
+        workspaceSlug &&
+        workItemId &&
+        workItemDetails &&
+        workItemDetails.project_id && (
+          <DeleteIssueModal
+            handleClose={() => toggleDeleteIssueModal(false)}
+            isOpen={isDeleteIssueModalOpen}
+            data={workItemDetails}
+            onSubmit={() =>
+              handleDeleteIssue(workspaceSlug.toString(), workItemDetails.project_id!, workItemId?.toString())
+            }
+            isEpic={workItemDetails?.is_epic}
+          />
+        )}
+      {IS_WORK_ITEM_DELETE_ENABLED && (
+        <BulkDeleteIssuesModal
+          isOpen={isBulkDeleteIssueModalOpen}
+          onClose={() => toggleBulkDeleteIssueModal(false)}
+          user={currentUser}
         />
       )}
-      <BulkDeleteIssuesModal
-        isOpen={isBulkDeleteIssueModalOpen}
-        onClose={() => toggleBulkDeleteIssueModal(false)}
-        user={currentUser}
-      />
     </>
   );
 });

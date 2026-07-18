@@ -6,6 +6,7 @@
 
 import React from "react";
 import { observer } from "mobx-react";
+import { IS_WORK_ITEM_DELETE_ENABLED } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { LinkIcon, EditIcon, TrashIcon, CloseIcon } from "@plane/propel/icons";
 // plane imports
@@ -66,6 +67,7 @@ export const RelationIssueListItem = observer(function RelationIssueListItem(pro
   const { isMobile } = usePlatformOS();
   // derived values
   const issue = getIssueById(relationIssueId);
+  const canDelete = !disabled && IS_WORK_ITEM_DELETE_ENABLED;
   const { handleRedirection } = useIssuePeekOverviewRedirection(!!issue?.is_epic);
   const issueOperations = useRelationOperations(issue?.is_epic ? EIssueServiceType.EPICS : EIssueServiceType.ISSUES);
   const projectDetail = (issue && issue.project_id && project.getProjectById(issue.project_id)) || undefined;
@@ -190,7 +192,7 @@ export const RelationIssueListItem = observer(function RelationIssueListItem(pro
                   </CustomMenu.MenuItem>
                 )}
 
-                {!disabled && (
+                {canDelete && (
                   <CustomMenu.MenuItem onClick={handleDeleteIssue}>
                     <div className="flex items-center gap-2">
                       <TrashIcon className="h-3.5 w-3.5" strokeWidth={2} />

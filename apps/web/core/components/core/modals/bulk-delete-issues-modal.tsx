@@ -12,6 +12,7 @@ import type { SubmitHandler } from "react-hook-form";
 import { useForm } from "react-hook-form";
 import { Combobox } from "@headlessui/react";
 // plane imports
+import { IS_WORK_ITEM_DELETE_ENABLED } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/propel/button";
 import { SearchIcon } from "@plane/propel/icons";
@@ -90,6 +91,8 @@ export const BulkDeleteIssuesModal = observer(function BulkDeleteIssuesModal(pro
       delete_issue_ids: [],
     },
   });
+
+  if (!IS_WORK_ITEM_DELETE_ENABLED) return null;
 
   const handleClose = () => {
     setQuery("");

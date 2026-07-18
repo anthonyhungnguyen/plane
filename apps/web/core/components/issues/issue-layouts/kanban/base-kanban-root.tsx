@@ -11,7 +11,7 @@ import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element
 import { autoScrollForElements } from "@atlaskit/pragmatic-drag-and-drop-auto-scroll/element";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-import { EIssueFilterType, EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
+import { EIssueFilterType, EUserPermissions, EUserPermissionsLevel, IS_WORK_ITEM_DELETE_ENABLED } from "@plane/constants";
 import type { EIssuesStoreType } from "@plane/types";
 import { EIssueServiceType, EIssueLayoutTypes } from "@plane/types";
 //hooks
@@ -126,6 +126,7 @@ export const BaseKanBanRoot = observer(function BaseKanBanRoot(props: IBaseKanBa
     [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
     EUserPermissionsLevel.PROJECT
   );
+  const isDeleteEnabled = IS_WORK_ITEM_DELETE_ENABLED && isEditingAllowed;
 
   const handleOnDrop = useGroupIssuesDragNDrop(storeType, orderBy, group_by, sub_group_by);
 
@@ -156,7 +157,7 @@ export const BaseKanBanRoot = observer(function BaseKanBanRoot(props: IBaseKanBa
   useEffect(() => {
     const element = deleteAreaRef.current;
 
-    if (!element) return;
+    if (!element || !isDeleteEnabled) return;
 
     return combine(
       dropTargetForElements({
@@ -179,7 +180,7 @@ export const BaseKanBanRoot = observer(function BaseKanBanRoot(props: IBaseKanBa
         },
       })
     );
-  }, [setIsDragOverDelete, setDraggedIssueId, setDeleteIssueModal]);
+  }, [isDeleteEnabled, setIsDragOverDelete, setDraggedIssueId, setDeleteIssueModal]);
 
   const renderQuickActions: TRenderQuickActions = useCallback(
     ({ issue, parentRef, customActionButton }) => (
@@ -235,30 +236,34 @@ export const BaseKanBanRoot = observer(function BaseKanBanRoot(props: IBaseKanBa
 
   return (
     <>
-      <DeleteIssueModal
-        dataId={draggedIssueId}
-        isOpen={deleteIssueModal}
-        handleClose={() => setDeleteIssueModal(false)}
-        onSubmit={handleDeleteIssue}
-        isEpic={isEpic}
-      />
-      {/* drag and delete component */}
-      <div
-        className={`fixed left-1/2 -translate-x-1/2 ${
-          isDragging ? "z-40" : ""
-        } top-3 mx-3 flex w-72 items-center justify-center`}
-        ref={deleteAreaRef}
-      >
+      {isDeleteEnabled && (
+        <>
+        <DeleteIssueModal
+          dataId={draggedIssueId}
+          isOpen={deleteIssueModal}
+          handleClose={() => setDeleteIssueModal(false)}
+          onSubmit={handleDeleteIssue}
+          isEpic={isEpic}
+        />
+        {/* drag and delete component */}
         <div
-          className={`${
-            isDragging ? `opacity-100` : `opacity-0`
-          } flex w-full items-center justify-center rounded-sm border-2 border-danger-strong/20 bg-surface-1 px-3 py-5 text-11 font-medium text-danger-primary italic ${
-            isDragOverDelete ? "bg-danger-primary blur-2xl" : ""
-          } transition duration-300`}
+          className={`fixed left-1/2 -translate-x-1/2 ${
+            isDragging ? "z-40" : ""
+          } top-3 mx-3 flex w-72 items-center justify-center`}
+          ref={deleteAreaRef}
         >
-          Drop here to delete the work item.
+          <div
+            className={`${
+              isDragging ? `opacity-100` : `opacity-0`
+            } flex w-full items-center justify-center rounded-sm border-2 border-danger-strong/20 bg-surface-1 px-3 py-5 text-11 font-medium text-danger-primary italic ${
+              isDragOverDelete ? "bg-danger-primary blur-2xl" : ""
+            } transition duration-300`}
+          >
+            Drop here to delete the work item.
+          </div>
         </div>
-      </div>
+        </>
+      )}
       <IssueLayoutHOC layout={EIssueLayoutTypes.KANBAN}>
         <div
           className={`horizontal-scrollbar relative flex scrollbar-lg h-full w-full bg-surface-2 ${sub_group_by ? "vertical-scrollbar overflow-y-auto" : "overflow-x-auto overflow-y-hidden"}`}

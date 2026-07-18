@@ -6,6 +6,7 @@
 
 import { observer } from "mobx-react";
 import { Link as Loader } from "lucide-react";
+import { IS_WORK_ITEM_DELETE_ENABLED } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { LinkIcon, EditIcon, TrashIcon, CloseIcon, ChevronRightIcon } from "@plane/propel/icons";
 // plane imports
@@ -76,6 +77,7 @@ export const SubIssuesListItem = observer(function SubIssuesListItem(props: Prop
   const { handleRedirection } = useIssuePeekOverviewRedirection();
   const { isMobile } = usePlatformOS();
   const issue = getIssueById(issueId);
+  const canDelete = canEdit && IS_WORK_ITEM_DELETE_ENABLED;
 
   // derived values
   const projectDetail = (issue && issue.project_id && project.getProjectById(issue.project_id)) || undefined;
@@ -231,7 +233,7 @@ export const SubIssuesListItem = observer(function SubIssuesListItem(props: Prop
                   </CustomMenu.MenuItem>
                 )}
 
-                {canEdit && (
+                {canDelete && (
                   <CustomMenu.MenuItem
                     onClick={() => {
                       handleIssueCrudState("delete", parentIssueId, issue);

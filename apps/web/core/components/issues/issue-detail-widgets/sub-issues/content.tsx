@@ -6,6 +6,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { observer } from "mobx-react";
+import { IS_WORK_ITEM_DELETE_ENABLED } from "@plane/constants";
 import type { TIssue, TIssueServiceType } from "@plane/types";
 import { EIssueServiceType, EIssuesStoreType } from "@plane/types";
 // components
@@ -105,6 +106,7 @@ export const SubIssuesCollapsibleContent = observer(function SubIssuesCollapsibl
 
   // render conditions
   const shouldRenderDeleteIssueModal =
+    IS_WORK_ITEM_DELETE_ENABLED &&
     issueCrudState?.delete?.toggle &&
     issueCrudState?.delete?.issue &&
     issueCrudState.delete.parentIssueId &&

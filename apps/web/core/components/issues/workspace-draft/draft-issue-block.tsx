@@ -10,6 +10,7 @@ import { observer } from "mobx-react";
 import { SquareStackIcon } from "lucide-react";
 import { CopyIcon, EditIcon, TrashIcon } from "@plane/propel/icons";
 // plane utils
+import { IS_WORK_ITEM_DELETE_ENABLED } from "@plane/constants";
 import { Tooltip } from "@plane/propel/tooltip";
 import type { TWorkspaceDraftIssue } from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
@@ -88,24 +89,30 @@ export const DraftIssueBlock = observer(function DraftIssueBlock(props: Props) {
         setCreateUpdateIssueModal(true);
       },
     },
-    {
-      key: "delete",
-      title: "delete",
-      icon: TrashIcon,
-      action: () => {
-        setDeleteIssueModal(true);
-      },
-    },
+    ...(IS_WORK_ITEM_DELETE_ENABLED
+      ? [
+          {
+            key: "delete",
+            title: "delete",
+            icon: TrashIcon,
+            action: () => {
+              setDeleteIssueModal(true);
+            },
+          },
+        ]
+      : []),
   ];
 
   return (
     <>
-      <WorkspaceDraftIssueDeleteIssueModal
-        data={issue}
-        isOpen={deleteIssueModal}
-        handleClose={() => setDeleteIssueModal(false)}
-        onSubmit={async () => deleteIssue(workspaceSlug, issueId)}
-      />
+      {IS_WORK_ITEM_DELETE_ENABLED && (
+        <WorkspaceDraftIssueDeleteIssueModal
+          data={issue}
+          isOpen={deleteIssueModal}
+          handleClose={() => setDeleteIssueModal(false)}
+          onSubmit={async () => deleteIssue(workspaceSlug, issueId)}
+        />
+      )}
       <CreateUpdateIssueModal
         isOpen={createUpdateIssueModal}
         onClose={() => {

@@ -6,7 +6,12 @@
 
 import { useEffect, useState } from "react";
 // types
-import { PROJECT_ERROR_MESSAGES, EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
+import {
+  PROJECT_ERROR_MESSAGES,
+  EUserPermissions,
+  EUserPermissionsLevel,
+  IS_WORK_ITEM_DELETE_ENABLED,
+} from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { TWorkspaceDraftIssue } from "@plane/types";
@@ -42,6 +47,7 @@ export function WorkspaceDraftIssueDeleteIssueModal(props: Props) {
     setIsDeleting(false);
   }, [isOpen]);
 
+  if (!IS_WORK_ITEM_DELETE_ENABLED) return null;
   if (!dataId && !data) return null;
 
   // derived values

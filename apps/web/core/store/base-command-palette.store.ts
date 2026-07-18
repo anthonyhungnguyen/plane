@@ -8,7 +8,7 @@ import { observable, action, computed, makeObservable, runInAction } from "mobx"
 import { computedFn } from "mobx-utils";
 // plane imports
 import type { TCreateModalStoreTypes, TCreatePageModal } from "@plane/constants";
-import { DEFAULT_CREATE_PAGE_MODAL_DATA, EPageAccess } from "@plane/constants";
+import { DEFAULT_CREATE_PAGE_MODAL_DATA, EPageAccess, IS_WORK_ITEM_DELETE_ENABLED } from "@plane/constants";
 import type { TProfileSettingsTabs } from "@plane/types";
 import { EIssuesStoreType } from "@plane/types";
 // lib
@@ -222,6 +222,10 @@ export class BaseCommandPaletteStore implements IBaseCommandPaletteStore {
    * @returns
    */
   toggleDeleteIssueModal = (value?: boolean) => {
+    if (!IS_WORK_ITEM_DELETE_ENABLED) {
+      this.isDeleteIssueModalOpen = false;
+      return;
+    }
     if (value !== undefined) {
       this.isDeleteIssueModalOpen = value;
     } else {
@@ -248,6 +252,10 @@ export class BaseCommandPaletteStore implements IBaseCommandPaletteStore {
    * @returns
    */
   toggleBulkDeleteIssueModal = (value?: boolean) => {
+    if (!IS_WORK_ITEM_DELETE_ENABLED) {
+      this.isBulkDeleteIssueModalOpen = false;
+      return;
+    }
     if (value !== undefined) {
       this.isBulkDeleteIssueModalOpen = value;
     } else {

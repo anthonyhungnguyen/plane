@@ -14,6 +14,7 @@ import type {
 } from "@plane/types";
 
 export const ALL_ISSUES = "All Issues";
+export const IS_WORK_ITEM_DELETE_ENABLED = false;
 
 export type TIssuePriorities = "urgent" | "high" | "medium" | "low" | "none";
 

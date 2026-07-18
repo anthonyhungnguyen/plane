@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { observer } from "mobx-react";
 // plane imports
+import { IS_WORK_ITEM_DELETE_ENABLED } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import type { TIssue, TIssueServiceType, TIssueRelationTypes } from "@plane/types";
 import { EIssueServiceType } from "@plane/types";
@@ -124,6 +125,7 @@ export const RelationsCollapsibleContent = observer(function RelationsCollapsibl
   const filteredRelationsArray = relationsArray.filter((relation) => relation.issueIds.length > 0);
 
   const shouldRenderIssueDeleteModal =
+    IS_WORK_ITEM_DELETE_ENABLED &&
     issueCrudState?.delete?.toggle &&
     issueCrudState?.delete?.issue &&
     issueCrudState.delete.issueId &&

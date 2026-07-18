@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // types
-import { PROJECT_ERROR_MESSAGES, EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
+import { PROJECT_ERROR_MESSAGES, EUserPermissions, EUserPermissionsLevel, IS_WORK_ITEM_DELETE_ENABLED } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { TDeDupeIssue, TIssue } from "@plane/types";
@@ -46,6 +46,7 @@ export const DeleteIssueModal = observer(function DeleteIssueModal(props: Props)
     setIsDeleting(false);
   }, [isOpen]);
 
+  if (!IS_WORK_ITEM_DELETE_ENABLED) return null;
   if (!dataId && !data) return null;
 
   // derived values

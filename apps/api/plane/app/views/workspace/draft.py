@@ -198,6 +198,10 @@ class WorkspaceDraftIssueViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=DraftIssue, level="WORKSPACE")
     def destroy(self, request, slug, pk=None):
+        return Response(
+            {"error": "Work item deletion is disabled."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
         draft_issue = DraftIssue.objects.get(workspace__slug=slug, pk=pk)
         draft_issue.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { observer } from "mobx-react";
 import { Clock, FileStack, MoreHorizontal, MoveRight } from "lucide-react";
 // plane imports
-import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
+import { EUserPermissions, EUserPermissionsLevel, IS_WORK_ITEM_DELETE_ENABLED } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/propel/button";
 import { IconButton, getIconButtonStyling } from "@plane/propel/icon-button";
@@ -97,8 +97,9 @@ export const InboxIssueActionsHeader = observer(function InboxIssueActionsHeader
   const canMarkAsDeclined = isAllowed && (inboxIssue?.status === 0 || inboxIssue?.status === -2);
   // can delete only if admin or is creator of the issue
   const canDelete =
-    allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.PROJECT, workspaceSlug, projectId) ||
-    issue?.created_by === currentUser?.id;
+    (allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.PROJECT, workspaceSlug, projectId) ||
+      issue?.created_by === currentUser?.id) &&
+    IS_WORK_ITEM_DELETE_ENABLED;
   const isProjectAdmin = allowPermissions(
     [EUserPermissions.ADMIN],
     EUserPermissionsLevel.PROJECT,
@@ -158,6 +159,7 @@ export const InboxIssueActionsHeader = observer(function InboxIssueActionsHeader
   };
 
   const handleInboxIssueDelete = async () => {
+    if (!IS_WORK_ITEM_DELETE_ENABLED) return;
     if (!inboxIssue || !currentInboxIssueId) return;
     await deleteInboxIssue(workspaceSlug, projectId, currentInboxIssueId).then(() => {
       if (!isNotificationEmbed) router.push(`/${workspaceSlug}/projects/${projectId}/intake`);
@@ -272,12 +274,14 @@ export const InboxIssueActionsHeader = observer(function InboxIssueActionsHeader
           onClose={() => setDeclineIssueModal(false)}
           onSubmit={handleInboxIssueDecline}
         />
-        <DeleteInboxIssueModal
-          data={inboxIssue?.issue}
-          isOpen={deleteIssueModal}
-          onClose={() => setDeleteIssueModal(false)}
-          onSubmit={handleInboxIssueDelete}
-        />
+        {IS_WORK_ITEM_DELETE_ENABLED && (
+          <DeleteInboxIssueModal
+            data={inboxIssue?.issue}
+            isOpen={deleteIssueModal}
+            onClose={() => setDeleteIssueModal(false)}
+            onSubmit={handleInboxIssueDelete}
+          />
+        )}
         <InboxIssueSnoozeModal
           isOpen={isSnoozeDateModalOpen}
           handleClose={() => setIsSnoozeDateModalOpen(false)}
