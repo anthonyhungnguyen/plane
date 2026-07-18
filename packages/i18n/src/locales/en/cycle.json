@@ -11,7 +11,7 @@
         "title": "Observe high priority work items tackled in the cycle at a glance."
       },
       "assignee": {
-        "title": "Add assignees to work items to see a breakdown of work by assignees."
+        "title": "Add assignee to work items to see a breakdown of work by assignee."
       },
       "label": {
         "title": "Add labels to work items to see the breakdown of work by labels."

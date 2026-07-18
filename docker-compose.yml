@@ -1,6 +1,8 @@
 services:
   web:
+    image: asia-southeast1-docker.pkg.dev/ghn-datawarehouse/data-platform/plane-web:$TAG
     container_name: web
+    platform: linux/amd64
     build:
       context: .
       dockerfile: ./apps/web/Dockerfile.web
@@ -11,7 +13,9 @@ services:
       - api
 
   admin:
+    image: asia-southeast1-docker.pkg.dev/ghn-datawarehouse/data-platform/plane-admin:$TAG
     container_name: admin
+    platform: linux/amd64
     build:
       context: .
       dockerfile: ./apps/admin/Dockerfile.admin
@@ -23,7 +27,9 @@ services:
       - web
 
   space:
+    image: asia-southeast1-docker.pkg.dev/ghn-datawarehouse/data-platform/plane-space:$TAG
     container_name: space
+    platform: linux/amd64
     build:
       context: .
       dockerfile: ./apps/space/Dockerfile.space
@@ -35,7 +41,9 @@ services:
       - web
 
   api:
+    image: asia-southeast1-docker.pkg.dev/ghn-datawarehouse/data-platform/plane-api:$TAG
     container_name: api
+    platform: linux/amd64
     build:
       context: ./apps/api
       dockerfile: Dockerfile.api
@@ -50,7 +58,9 @@ services:
       - plane-redis
 
   worker:
+    image: asia-southeast1-docker.pkg.dev/ghn-datawarehouse/data-platform/plane-worker:$TAG
     container_name: bgworker
+    platform: linux/amd64
     build:
       context: ./apps/api
       dockerfile: Dockerfile.api
@@ -66,7 +76,9 @@ services:
       - plane-redis
 
   beat-worker:
+    image: asia-southeast1-docker.pkg.dev/ghn-datawarehouse/data-platform/plane-beat-worker:$TAG
     container_name: beatworker
+    platform: linux/amd64
     build:
       context: ./apps/api
       dockerfile: Dockerfile.api
@@ -82,7 +94,9 @@ services:
       - plane-redis
 
   migrator:
+    image: asia-southeast1-docker.pkg.dev/ghn-datawarehouse/data-platform/plane-migrator:$TAG
     container_name: plane-migrator
+    platform: linux/amd64
     build:
       context: ./apps/api
       dockerfile: Dockerfile.api
@@ -97,7 +111,9 @@ services:
       - plane-redis
 
   live:
+    image: asia-southeast1-docker.pkg.dev/ghn-datawarehouse/data-platform/plane-live:$TAG
     container_name: plane-live
+    platform: linux/amd64
     build:
       context: .
       dockerfile: ./apps/live/Dockerfile.live
@@ -153,6 +169,8 @@ services:
 
   # Comment this if you already have a reverse proxy running
   proxy:
+    image: asia-southeast1-docker.pkg.dev/ghn-datawarehouse/data-platform/plane-proxy:$TAG
+    platform: linux/amd64
     container_name: proxy
     build:
       context: ./apps/proxy

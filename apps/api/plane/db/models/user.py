@@ -256,8 +256,6 @@ class Profile(TimeAuditModel):
     # navigation tour
     is_navigation_tour_completed = models.BooleanField(default=False)
 
-    # marketing
-    has_marketing_email_consent = models.BooleanField(default=False)
     is_subscribed_to_changelog = models.BooleanField(default=False)
     product_tour = models.JSONField(default=get_default_product_tour)
 
