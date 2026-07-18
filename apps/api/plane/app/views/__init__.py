@@ -10,6 +10,7 @@ from .project.base import (
     DeployBoardViewSet,
     ProjectArchiveUnarchiveEndpoint,
 )
+from .project.work_item_template import WorkItemTemplateEndpoint
 
 from .project.invite import (
     UserProjectInvitationsViewset,

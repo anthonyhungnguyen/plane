@@ -6,7 +6,7 @@
 
 import { createContext } from "react";
 // ce imports
-import type { UseFormReset, UseFormWatch } from "react-hook-form";
+import type { UseFormReset, UseFormWatch, UseFormGetValues, UseFormSetValue } from "react-hook-form";
 // plane imports
 import type { EditorRefApi } from "@plane/editor";
 import type { ISearchIssueResponse, TIssue, TIssuePropertyValues, TIssuePropertyValueErrors } from "@plane/types";
@@ -39,7 +39,10 @@ export type TCreateSubWorkItemProps = {
 
 export type THandleTemplateChangeProps = {
   workspaceSlug: string;
+  projectId: string;
   reset: UseFormReset<TIssue>;
+  getValues: UseFormGetValues<TIssue>;
+  setValue: UseFormSetValue<TIssue>;
   editorRef: React.MutableRefObject<EditorRefApi | null>;
 };
 

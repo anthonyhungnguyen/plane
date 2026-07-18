@@ -52,6 +52,7 @@ export interface IProject extends IPartialProject {
   readonly cover_image_url?: string;
   default_assignee?: IUser | string | null;
   default_state?: string | null;
+  default_work_item_template?: string | null;
   description?: string;
   estimate?: string | null;
   anchor?: string | null;

@@ -18,6 +18,7 @@ from plane.app.views import (
     UserProjectRolesEndpoint,
     ProjectArchiveUnarchiveEndpoint,
     ProjectMemberPreferenceEndpoint,
+    WorkItemTemplateEndpoint,
 )
 
 
@@ -128,5 +129,20 @@ urlpatterns = [
         "workspaces/<str:slug>/projects/<uuid:project_id>/preferences/member/<uuid:member_id>/",
         ProjectMemberPreferenceEndpoint.as_view(),
         name="project-member-preference",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/work-item-templates/",
+        WorkItemTemplateEndpoint.as_view({"get": "list", "post": "create"}),
+        name="work-item-templates",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/work-item-templates/<uuid:pk>/",
+        WorkItemTemplateEndpoint.as_view({"get": "retrieve", "patch": "partial_update", "delete": "destroy"}),
+        name="work-item-template",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/work-item-templates/<uuid:pk>/use/",
+        WorkItemTemplateEndpoint.as_view({"post": "use"}),
+        name="work-item-template-use",
     ),
 ]

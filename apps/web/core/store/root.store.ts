@@ -58,6 +58,8 @@ import type { IProjectPageStore } from "./pages/project-page.store";
 import { ProjectPageStore } from "./pages/project-page.store";
 import type { IProjectRootStore } from "./project";
 import { ProjectRootStore } from "./project";
+import type { IWorkItemTemplateStore } from "./project/work-item-template.store";
+import { WorkItemTemplateStore } from "./project/work-item-template.store";
 import type { IProjectViewStore } from "./project-view.store";
 import { ProjectViewStore } from "./project-view.store";
 import type { IRouterStore } from "./router.store";
@@ -101,6 +103,7 @@ export class CoreRootStore {
   stickyStore: IStickyStore;
   editorAssetStore: IEditorAssetStore;
   workItemFilters: IWorkItemFilterStore;
+  workItemTemplate: IWorkItemTemplateStore;
   powerK: IPowerKStore;
   timelineStore: ITimelineStore;
 
@@ -133,6 +136,7 @@ export class CoreRootStore {
     this.editorAssetStore = new EditorAssetStore();
     this.analytics = new AnalyticsStore();
     this.workItemFilters = new WorkItemFilterStore();
+    this.workItemTemplate = new WorkItemTemplateStore(this);
     this.powerK = new PowerKStore();
     this.timelineStore = new TimeLineStore(this);
   }
@@ -167,6 +171,7 @@ export class CoreRootStore {
     this.stickyStore = new StickyStore();
     this.editorAssetStore = new EditorAssetStore();
     this.workItemFilters = new WorkItemFilterStore();
+    this.workItemTemplate = new WorkItemTemplateStore(this);
     this.powerK = new PowerKStore();
     this.timelineStore = new TimeLineStore(this);
   }

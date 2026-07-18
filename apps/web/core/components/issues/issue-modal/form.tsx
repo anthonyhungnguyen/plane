@@ -36,7 +36,9 @@ import {
   IssueProjectSelect,
   IssueTitleInput,
 } from "@/components/issues/issue-modal/components";
+import { WorkItemTemplateSelect } from "@/components/issues/issue-modal/template-select";
 // helpers
+import { applyWorkItemTemplate } from "@/helpers/work-item-template.helper";
 // hooks
 import { useIssueModal } from "@/hooks/context/use-issue-modal";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
@@ -68,7 +70,7 @@ export interface IssueFormProps {
   handleDraftAndClose?: () => void;
   isProjectSelectionDisabled?: boolean;
   showActionButtons?: boolean;
-  dataResetProperties?: any[];
+  dataResetProperties?: unknown[];
 }
 
 export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormProps) {
@@ -170,7 +172,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
         reset(getUpdateFormDataForReset(projectId, getValues()));
       }
     }
-    if (projectId && routeProjectId !== projectId) fetchCycles(workspaceSlug?.toString(), projectId);
+    if (projectId && routeProjectId !== projectId) void fetchCycles(workspaceSlug?.toString(), projectId);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
@@ -199,14 +201,50 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
 
   useEffect(() => {
     if (workItemTemplateId && editorRef.current) {
-      handleTemplateChange({
-        workspaceSlug: workspaceSlug?.toString(),
+      void handleTemplateChange({
+        workspaceSlug: workspaceSlug?.toString() ?? "",
+        projectId: projectId ?? "",
         reset,
+        getValues,
+        setValue,
         editorRef,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workItemTemplateId]);
+
+  // Apply default template on project change if new issue
+  useEffect(() => {
+    const applyDefaultTemplate = async () => {
+      if (
+        !data?.id &&
+        !isDraft &&
+        projectDetails?.default_work_item_template &&
+        !workItemTemplateId &&
+        workspaceSlug &&
+        projectId
+      ) {
+        try {
+          const { description } = await applyWorkItemTemplate({
+            workspaceSlug: workspaceSlug.toString(),
+            projectId,
+            templateId: projectDetails.default_work_item_template,
+            getValues,
+            setValue,
+          });
+          setWorkItemTemplateId(projectDetails.default_work_item_template);
+          if (description && editorRef.current) {
+            editorRef.current.setEditorValue(description);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    };
+
+    void applyDefaultTemplate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectDetails?.default_work_item_template, projectId]);
 
   const handleFormSubmit = async (formData: Partial<TIssue>, is_draft_issue = false) => {
     // Check if the editor is ready to discard
@@ -240,13 +278,13 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
         };
 
     // this condition helps to move the issues from draft to project issues
-    if (formData.hasOwnProperty("is_draft")) submitData.is_draft = formData.is_draft;
+    if (Object.prototype.hasOwnProperty.call(formData, "is_draft")) submitData.is_draft = formData.is_draft;
 
     await onSubmit(submitData, is_draft_issue)
       .then(() => {
         setGptAssistantModal(false);
         if (isCreateMoreToggleEnabled && workItemTemplateId) {
-          handleTemplateChange({
+          void handleTemplateChange({
             workspaceSlug: workspaceSlug?.toString(),
             reset,
             editorRef,
@@ -261,6 +299,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
           });
           editorRef?.current?.clearEditor();
         }
+        return;
       })
       .catch((error) => {
         console.error(error);
@@ -368,6 +407,22 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
                     disabled={!!data?.id || !!data?.sourceIssueId || isProjectSelectionDisabled}
                     handleFormChange={handleFormChange}
                   />
+                  {projectId && !data?.id && !data?.sourceIssueId && (
+                    <WorkItemTemplateSelect
+                      projectId={projectId}
+                      typeId={watch("type_id")}
+                      editorRef={editorRef}
+                      handleModalClose={() => {
+                        if (handleDraftAndClose) {
+                          handleDraftAndClose();
+                        } else {
+                          onClose();
+                        }
+                      }}
+                      handleFormChange={handleFormChange}
+                      renderChevron
+                    />
+                  )}
                 </div>
               </div>
               {watch("parent_id") && selectedParentIssue && (
@@ -437,6 +492,8 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
                   parentId={watch("parent_id")}
                   isDraft={isDraft}
                   handleFormChange={handleFormChange}
+                  getValues={getValues}
+                  setValue={setValue}
                   setSelectedParentIssue={setSelectedParentIssue}
                 />
               </div>
@@ -453,6 +510,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
                         if (e.key === "Enter") onCreateMoreToggleChange(!isCreateMoreToggleEnabled);
                       }}
                       role="button"
+                      tabIndex={0}
                     >
                       <ToggleSwitch value={isCreateMoreToggleEnabled} onChange={() => {}} size="sm" />
                       <span className="text-caption-sm-regular">{t("create_more")}</span>
@@ -496,7 +554,9 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
                         variant="primary"
                         type="button"
                         loading={isMoving}
-                        onClick={handleMoveToProjects}
+                        onClick={() => {
+                          void handleMoveToProjects();
+                        }}
                         disabled={isMoving}
                         size="lg"
                       >

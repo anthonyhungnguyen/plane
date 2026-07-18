@@ -189,6 +189,7 @@ class ProjectViewSet(BaseViewSet):
             "inbox_view",
             "guest_view_all_features",
             "project_lead",
+            "default_work_item_template",
             "network",
             "created_at",
             "updated_at",

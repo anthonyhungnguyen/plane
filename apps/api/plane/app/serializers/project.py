@@ -85,6 +85,25 @@ class ProjectSerializer(BaseSerializer):
             if not is_valid:
                 raise serializers.ValidationError({"error": "html content is not valid"})
 
+        default_template = data.get("default_work_item_template")
+        project = self.instance
+
+        if default_template:
+            if project is None:
+                raise serializers.ValidationError(
+                    {"default_work_item_template": "Default template can only be set on an existing project."}
+                )
+
+            if default_template.project_id != project.id:
+                raise serializers.ValidationError(
+                    {"default_work_item_template": "Template must belong to this project."}
+                )
+
+            if not default_template.is_active:
+                raise serializers.ValidationError(
+                    {"default_work_item_template": "Only active templates can be set as default."}
+                )
+
         return data
 
     def create(self, validated_data):
